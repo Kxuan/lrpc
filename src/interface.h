@@ -31,12 +31,13 @@ struct lrpc_interface
 {
 	struct lrpc_socket sock;
 	struct method_table all_methods;
-	//fixme
 };
 
 void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len);
 
 int lrpc_start(struct lrpc_interface *inf);
+
+int lrpc_stop(struct lrpc_interface *inf);
 
 int lrpc_poll(struct lrpc_interface *inf);
 

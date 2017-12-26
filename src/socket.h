@@ -82,4 +82,6 @@ void lrpc_socket_init(struct lrpc_socket *sock, const char *name, size_t name_le
 
 int lrpc_socket_open(struct lrpc_socket *sock);
 
+void lrpc_socket_close(struct lrpc_socket *sock);
+
 #endif //LRPC_SOCKET_H

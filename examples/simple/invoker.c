@@ -46,5 +46,8 @@ int main()
 		fprintf(stderr, "result mismatched!\n");
 		return 1;
 	}
+	
+	lrpc_stop(&inf);
+
 	return 0;
 }

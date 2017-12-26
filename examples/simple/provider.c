@@ -57,5 +57,7 @@ int main()
 		abort();
 	}
 
+	lrpc_stop(&inf);
+	
 	return 0;
 }

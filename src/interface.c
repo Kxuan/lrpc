@@ -259,6 +259,11 @@ int lrpc_start(struct lrpc_interface *inf)
 	return lrpc_socket_open(&inf->sock);
 }
 
+int lrpc_stop(struct lrpc_interface *inf)
+{
+	lrpc_socket_close(&inf->sock);
+}
+
 int lrpc_poll(struct lrpc_interface *inf)
 {
 	struct sockaddr_un addr;
