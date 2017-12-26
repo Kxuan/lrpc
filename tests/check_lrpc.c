@@ -93,11 +93,9 @@ START_TEST(test_call)
 
 	if (pid == 0) {
 		provider(fds[1]);
-		fprintf(stderr, "provider done\n");
 		exit(0);
 	} else {
 		invoker(fds[0]);
-		fprintf(stderr, "invoker done\n");
 		rc = waitpid(pid, NULL, 0);
 		ck_assert_int_eq(rc, pid);
 	}
