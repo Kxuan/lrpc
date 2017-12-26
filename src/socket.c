@@ -14,25 +14,31 @@
    <http://www.gnu.org/licenses/>.  */
 
 #include <unistd.h>
+#include <errno.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
+#include <assert.h>
+
 #include "config.h"
 #include "socket.h"
 
-void endpoint_init(struct lrpc_endpoint *endpoint, const char *name, size_t name_len)
+void endpoint_init(struct lrpc_endpoint *endpoint, struct lrpc_socket *sock, const char *name, size_t name_len)
 {
 	char *p;
 
+	assert(endpoint && name_len && name);
+
+	endpoint->sock = sock;
 	endpoint->addr.sun_family = AF_UNIX;
 	p = endpoint->addr.sun_path;
 	*p++ = 0;
 	memcpy(p, LRPC_MSG_NAME_PREFIX, sizeof(LRPC_MSG_NAME_PREFIX) - 1);
 	p += sizeof(LRPC_MSG_NAME_PREFIX) - 1;
-	strcpy(p, name);
+	memcpy(p, name, name_len);
 	p += name_len;
-	endpoint->addr_len = (socklen_t) (p - endpoint->addr.sun_path);
+	endpoint->addr_len = (socklen_t) (offsetof(struct sockaddr_un, sun_path) + (p - endpoint->addr.sun_path));
 }
 
 void lrpc_socket_init(struct lrpc_socket *sock, const char *name, size_t name_len)
@@ -40,9 +46,7 @@ void lrpc_socket_init(struct lrpc_socket *sock, const char *name, size_t name_le
 	struct lrpc_endpoint *endpoint = &sock->endpoint;
 
 	endpoint->sock = sock;
-	endpoint_init(endpoint, name, name_len);
-	sock->recv_buf_size = sizeof(sock->recv_buf);
-	sock->send_buf_size = sizeof(sock->send_buf);
+	endpoint_init(endpoint, NULL, name, name_len);
 	sock->fd = -1;
 }
 
@@ -62,7 +66,6 @@ int lrpc_socket_open(struct lrpc_socket *sock)
 	if (rc < 0) {
 		goto err_bind;
 	}
-
 	sock->fd = fd;
 	return 0;
 err_bind:
@@ -79,28 +82,47 @@ void lrpc_socket_close(struct lrpc_socket *sock)
 	}
 }
 
-int endpoint_open(struct lrpc_socket *sock, struct lrpc_endpoint *endpoint, const char *name, size_t name_len)
-{
-	assert(sock && endpoint && name);
-
-	endpoint_init(endpoint, name, name_len);
-	endpoint->sock = sock;
-	return 0;
-}
-
 void lrpc_endpoint_close(struct lrpc_socket *sock, struct lrpc_endpoint *endpoint)
 {
 
 }
 
-ssize_t lrpc_socket_recvmsg(struct lrpc_socket *sock, struct msghdr *m, int flags)
+void lrpc_socket_freemsg(struct lrpc_packet *m)
 {
-	m->msg_controllen = 0;
-	m->msg_control = NULL;
-	m->msg_iov->iov_base = sock->recv_buf;
-	m->msg_iov->iov_len = sock->recv_buf_size;
-	m->msg_iovlen = 1;
-	return recvmsg(sock->fd, m, flags);
+	free(m);
+}
+
+struct lrpc_packet *lrpc_socket_recvmsg(struct lrpc_socket *sock, int flags)
+{
+	ssize_t size;
+	struct lrpc_packet *m;
+
+	m = (struct lrpc_packet *) malloc(sizeof(struct lrpc_packet) + LRPC_MAX_PACKET_SIZE);
+	if (!m) {
+		goto err;
+	}
+
+	m->iov.iov_base = m->payload;
+	m->iov.iov_len = LRPC_MAX_PACKET_SIZE;
+
+	m->msgh.msg_name = &m->addr;
+	m->msgh.msg_namelen = sizeof(m->addr);
+	m->msgh.msg_controllen = 0;
+	m->msgh.msg_control = NULL;
+	m->msgh.msg_iov = &m->iov;
+	m->msgh.msg_iovlen = 1;
+
+	size = recvmsg(sock->fd, &m->msgh, flags);
+	if (size <= 0) {
+		goto err_recvmsg;
+	}
+	m->payload_len = (size_t) size;
+	return m;
+
+err_recvmsg:
+	free(m);
+err:
+	return NULL;
 }
 
 ssize_t lrpc_socket_sendmsg(struct lrpc_socket *sock, struct msghdr *m, int flags)

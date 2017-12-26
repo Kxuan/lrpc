@@ -17,20 +17,9 @@
 #ifndef LRPC_METHOD_H
 #define LRPC_METHOD_H
 
-#include "lrpc.h"
-
 #define LRPC_METHOD_NAME_MAX (32)
 
-typedef enum lrpc_return_status
-{
-	LRPC_RETURN_VAL,
-	LRPC_RETURN_ERROR
-} lrpc_return_status;
-
-
-typedef lrpc_return_status (*lrpc_method_cb)(void *user_data,
-                                             void *args, size_t args_len,
-                                             void *ret_val, size_t *ret_size);
+typedef int (*lrpc_method_cb)(void *user_data, const void *call, void *args, size_t args_len);
 
 struct lrpc_method
 {

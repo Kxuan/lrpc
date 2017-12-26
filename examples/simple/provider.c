@@ -12,22 +12,20 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the lrpc; if not, see
    <http://www.gnu.org/licenses/>.  */
-#include <assert.h>
+
 #include <stdlib.h>
 #include <string.h>
 #include <interface.h>
 #include <stdio.h>
 #include "common.h"
 
-
-lrpc_return_status provider_echo(void *user_data,
-                                 void *args, size_t args_len,
-                                 void *ret_val, size_t *ret_size)
+int sync_rpc_echo(void *user_data,
+                  const void *ctx,
+                  void *args, size_t args_len)
 {
-	memcpy(ret_val, args, args_len);
-	*ret_size = args_len;
+   	lrpc_return(ctx, args, args_len);
 
-	return LRPC_RETURN_VAL;
+	return 0;
 }
 
 int main()
@@ -37,8 +35,8 @@ int main()
 	struct lrpc_method method;
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
-	lrpc_method_init(&method, "echo", provider_echo, NULL);
 
+	lrpc_method_init(&method, "echo", sync_rpc_echo, main);
 	rc = lrpc_register_method(&inf, &method);
 	if (rc < 0) {
 		perror("lrpc_register_method");
@@ -58,6 +56,6 @@ int main()
 	}
 
 	lrpc_stop(&inf);
-	
+
 	return 0;
 }

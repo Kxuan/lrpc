@@ -21,6 +21,8 @@
 #include <string.h>
 #include "interface.h"
 #include "socket.h"
+#include "msg.h"
+#include "lrpc.h"
 
 static int lrpc_invoke(struct lrpc_endpoint *endpoint, struct msghdr *msg, struct msghdr *rmsg)
 {
@@ -116,131 +118,11 @@ int lrpc_call(struct lrpc_endpoint *endpoint,
 	return rc;
 }
 
-static int lrpc_do_return(struct lrpc_socket *sock,
-                          const struct sockaddr_un *msg_from, socklen_t msg_from_len,
-                          struct lrpc_msg_call *call,
-                          enum lrpc_msg_types status, void *body, size_t body_len)
-{
-	struct msghdr msg;
-	struct iovec iov[2];
-	struct lrpc_msg_return r;
-	ssize_t size;
-
-	r.head.cookie = call->head.cookie;
-	r.head.type = status;
-	r.head.body_size = sizeof(int);
-	r.returns_len = r.head.body_size;
-
-	iov[0].iov_base = &r;
-	iov[0].iov_len = sizeof(r);
-	iov[1].iov_base = body;
-	iov[1].iov_len = body_len;
-
-	msg.msg_name = (void *) msg_from;
-	msg.msg_namelen = msg_from_len;
-	msg.msg_control = NULL;
-	msg.msg_controllen = 0;
-	msg.msg_iov = iov;
-	msg.msg_iovlen = sizeof(iov) / sizeof(*iov);
-	msg.msg_flags = 0;
-
-	size = sendmsg(sock->fd, &msg, MSG_NOSIGNAL);
-	if (size < 0) {
-		return -1;
-	}
-	return 0;
-}
-
-static int lrpc_return_error(struct lrpc_interface *inf,
-                             const struct sockaddr_un *msg_from, socklen_t msg_from_len,
-                             struct lrpc_msg_call *call, int err)
-{
-	return lrpc_do_return(&inf->sock, msg_from, msg_from_len, call, LRPC_MSGTYP_RETURN_ERROR, &err, sizeof(err));
-}
-
-static int lrpc_return_val(struct lrpc_interface *inf,
-                           const struct sockaddr_un *msg_from, socklen_t msg_from_len,
-                           struct lrpc_msg_call *call, void *ret, size_t ret_size)
-{
-	return lrpc_do_return(&inf->sock, msg_from, msg_from_len, call, LRPC_MSGTYP_RETURN_VAL, ret, ret_size);
-}
-
-
-static int lrpc_feed_msg_call(struct lrpc_interface *inf,
-                              const struct sockaddr_un *msg_from, socklen_t msg_from_len,
-                              struct lrpc_msg_call *call, void *args, size_t args_len)
-{
-	struct lrpc_method *method;
-	struct lrpc_msg_return *ret;
-	size_t ret_size;
-	lrpc_return_status ret_status;
-
-
-	if (call->method_len > sizeof(call->method) || call->args_len != args_len) {
-		errno = EPROTO;
-		return -1;
-	}
-
-	method = method_find(&inf->all_methods, call->method, call->method_len);
-	if (method == NULL) {
-		lrpc_return_error(inf, msg_from, msg_from_len, call, EOPNOTSUPP);
-		errno = EINVAL;
-		return -1;
-	}
-
-	ret = (struct lrpc_msg_return *) inf->sock.send_buf;
-	ret_size = LRPC_MAX_PACKET_SIZE;
-
-	ret_status = method->callback(method->user_data, call + 1, call->args_len, ret, &ret_size);
-
-	switch (ret_status) {
-	case LRPC_RETURN_VAL: {
-		ret->returns_len = (uint16_t) ret_size;
-		assert(ret_size <= LRPC_MAX_PACKET_SIZE);
-
-		lrpc_return_val(inf, msg_from, msg_from_len, call, ret, ret_size);
-
-		break;
-	}
-	case LRPC_RETURN_ERROR:
-		lrpc_return_error(inf, msg_from, msg_from_len, call, errno);
-		break;
-	}
-
-}
-
-static int lrpc_feed_msg(struct lrpc_interface *inf, struct msghdr *msg, size_t msg_size)
-{
-	struct lrpc_msg_head *head;
-	int rc = -1;
-
-	head = msg->msg_iov[0].iov_base;
-
-	if (sizeof(*head) + head->body_size > msg_size) {
-		errno = EPROTO;
-		return -1;
-	}
-
-	switch (head->type) {
-	case LRPC_MSGTYP_CALL:
-		rc = lrpc_feed_msg_call(inf, msg->msg_name, msg->msg_namelen, (struct lrpc_msg_call *) head, head + 1,
-		                        msg_size - sizeof(struct lrpc_msg_call));
-		break;
-	case LRPC_MSGTYP_RETURN_VAL:
-	case LRPC_MSGTYP_RETURN_ERROR:
-		fprintf(stderr, "LRPC_MSGTYP_RETURN_VAL/LRPC_MSGTYP_RETURN_ERROR is not support yet.\n");
-		abort();
-		break;
-	default:
-		break;
-	}
-	return rc;
-}
-
 int lrpc_connect(struct lrpc_interface *inf,
                  struct lrpc_endpoint *endpoint, const char *name, size_t name_len)
 {
-	return endpoint_open(&inf->sock, endpoint, name, name_len);
+	endpoint_init(endpoint, &inf->sock, name, name_len);
+	return 0;
 }
 
 int lrpc_register_method(struct lrpc_interface *inf, struct lrpc_method *method)
@@ -266,21 +148,13 @@ int lrpc_stop(struct lrpc_interface *inf)
 
 int lrpc_poll(struct lrpc_interface *inf)
 {
-	struct sockaddr_un addr;
-	struct msghdr msg;
-	struct iovec iov;
-	ssize_t size;
-
-	msg.msg_name = &addr;
-	msg.msg_namelen = sizeof(addr);
-	msg.msg_iov = &iov;
-	msg.msg_iovlen = 1;
-	size = lrpc_socket_recvmsg(&inf->sock, &msg, 0);
-	if (size <= 0) {
+	struct lrpc_packet *msg;
+	msg = lrpc_socket_recvmsg(&inf->sock, 0);
+	if (!msg) {
 		return -1;
 	}
 
-	lrpc_feed_msg(inf, &msg, size);
+	lrpc_msg_feed(inf, msg);
 
 	return 0;
 }

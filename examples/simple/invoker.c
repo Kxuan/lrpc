@@ -23,20 +23,20 @@ int main()
 	int rc;
 	char buf[10];
 	struct lrpc_interface inf;
-	struct lrpc_endpoint peer;
+	struct lrpc_endpoint provider;
 	ssize_t size;
 
 	lrpc_init(&inf, NAME_INVOKER, sizeof(NAME_INVOKER));
 
 	lrpc_start(&inf);
 
-	rc = lrpc_connect(&inf, &peer, NAME_PROVIDER, sizeof(NAME_PROVIDER));
+	rc = lrpc_connect(&inf, &provider, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 	if (rc < 0) {
 		perror("lrpc_connect");
 		abort();
 	}
 
-	rc = lrpc_call(&peer, "echo", "hello", 6, buf, 10);
+	rc = lrpc_call(&provider, "echo", "hello", 6, buf, 10);
 	if (rc < 0) {
 		perror("lrpc_call");
 		abort();
@@ -46,7 +46,7 @@ int main()
 		fprintf(stderr, "result mismatched!\n");
 		return 1;
 	}
-	
+
 	lrpc_stop(&inf);
 
 	return 0;

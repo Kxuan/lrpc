@@ -29,6 +29,8 @@ include_directories(BEFORE ${CMAKE_CURRENT_BINARY_DIR})
 add_definitions(-DHAVE_CONFIG_H)
 set(CONFIG_HEADER ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
+include_directories(include)
+
 add_subdirectory(src)
 add_subdirectory(tests)
 add_subdirectory(examples)

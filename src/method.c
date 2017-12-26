@@ -54,7 +54,7 @@ void lrpc_method_init(struct lrpc_method *method, const char *name, lrpc_method_
 {
 	method->name = name;
 	method->callback = callback;
-	method->user_data = NULL;
+	method->user_data = user_data;
 }
 
 struct lrpc_method *lrpc_method_create(const char *name, lrpc_method_cb callback, void *user_data)
