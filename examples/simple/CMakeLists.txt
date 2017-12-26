@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
+include_directories(../../src)
+add_executable(simple-provider provider.c)
+add_executable(simple-invoker invoker.c)
+target_link_libraries(simple-provider lrpc)
+target_link_libraries(simple-invoker lrpc)

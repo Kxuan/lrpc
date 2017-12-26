@@ -1,0 +1,1 @@
+#cmakedefine LRPC_MSG_NAME_PREFIX "@LRPC_MSG_NAME_PREFIX@"
