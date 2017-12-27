@@ -1,4 +1,4 @@
-/* Copyright (C) 2017 kXuan <kxuanobj@gmail.com>
+/*Copyright (C) 2017 kXuan <kxuanobj@gmail.com>
 
    This file is part of the lrpc.
    The lrpc is free software; you can redistribute it and/or
@@ -11,32 +11,22 @@
    Lesser General Public License for more details.
    You should have received a copy of the GNU Lesser General Public
    License along with the lrpc; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <http://www.gnu.org/licenses/>.*/
 
-#include <unistd.h>
-#include <check.h>
+#ifndef LRPC_ENDPOINT_H
+#define LRPC_ENDPOINT_H
+
+#include <sys/socket.h>
+#include <sys/un.h>
+
 #include <lrpc.h>
-#include <interface.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <wait.h>
 
-TCase *create_tcase_core();
+void endpoint_init(struct lrpc_endpoint *endpoint, struct lrpc_socket *sock, const char *name, size_t name_len);
 
-int main(void)
-{
-	int number_failed;
-	Suite *s;
-	SRunner *sr;
+ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
+                  const char *method_name, const void *args, size_t args_len,
+                  void *ret_ptr, size_t ret_size);
 
-	s = suite_create("lrpc");
+int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *ctx);
 
-	suite_add_tcase(s, create_tcase_core());
-
-	sr = srunner_create(s);
-	srunner_run_all(sr, CK_NORMAL);
-
-	number_failed = srunner_ntests_failed(sr);
-	srunner_free(sr);
-	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
-}
+#endif //LRPC_ENDPOINT_H

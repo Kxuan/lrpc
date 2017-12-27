@@ -17,23 +17,7 @@
 #ifndef LRPC_METHOD_H
 #define LRPC_METHOD_H
 
-#define LRPC_METHOD_NAME_MAX (32)
-
-typedef int (*lrpc_method_cb)(void *user_data, const void *call, void *args, size_t args_len);
-
-struct lrpc_method
-{
-	const char *name;
-	lrpc_method_cb callback;
-	void *user_data;
-
-	struct lrpc_method *prev, *next;
-};
-
-struct method_table
-{
-	struct lrpc_method *all_methods;
-};
+#include <lrpc.h>
 
 void method_table_init(struct method_table *table);
 

@@ -22,29 +22,14 @@
 #include <assert.h>
 
 #include "config.h"
+#include "interface.h"
 #include "socket.h"
 
-void endpoint_init(struct lrpc_endpoint *endpoint, struct lrpc_socket *sock, const char *name, size_t name_len)
-{
-	char *p;
-
-	assert(endpoint && name_len && name);
-
-	endpoint->sock = sock;
-	endpoint->addr.sun_family = AF_UNIX;
-	p = endpoint->addr.sun_path;
-	*p++ = 0;
-	memcpy(p, LRPC_MSG_NAME_PREFIX, sizeof(LRPC_MSG_NAME_PREFIX) - 1);
-	p += sizeof(LRPC_MSG_NAME_PREFIX) - 1;
-	memcpy(p, name, name_len);
-	p += name_len;
-	endpoint->addr_len = (socklen_t) (offsetof(struct sockaddr_un, sun_path) + (p - endpoint->addr.sun_path));
-}
-
-void lrpc_socket_init(struct lrpc_socket *sock, const char *name, size_t name_len)
+void lrpc_socket_init(struct lrpc_socket *sock, struct lrpc_interface *inf, const char *name, size_t name_len)
 {
 	struct lrpc_endpoint *endpoint = &sock->endpoint;
 
+	sock->inf = inf;
 	endpoint->sock = sock;
 	endpoint_init(endpoint, NULL, name, name_len);
 	sock->fd = -1;
@@ -87,20 +72,9 @@ void lrpc_endpoint_close(struct lrpc_socket *sock, struct lrpc_endpoint *endpoin
 
 }
 
-void lrpc_socket_freemsg(struct lrpc_packet *m)
-{
-	free(m);
-}
-
-struct lrpc_packet *lrpc_socket_recvmsg(struct lrpc_socket *sock, int flags)
+int socket_recvmsg(struct lrpc_socket *sock, struct lrpc_packet *m, int flags)
 {
 	ssize_t size;
-	struct lrpc_packet *m;
-
-	m = (struct lrpc_packet *) malloc(sizeof(struct lrpc_packet) + LRPC_MAX_PACKET_SIZE);
-	if (!m) {
-		goto err;
-	}
 
 	m->iov.iov_base = m->payload;
 	m->iov.iov_len = LRPC_MAX_PACKET_SIZE;
@@ -114,18 +88,16 @@ struct lrpc_packet *lrpc_socket_recvmsg(struct lrpc_socket *sock, int flags)
 
 	size = recvmsg(sock->fd, &m->msgh, flags);
 	if (size <= 0) {
-		goto err_recvmsg;
+		goto err;
 	}
 	m->payload_len = (size_t) size;
-	return m;
+	return 0;
 
-err_recvmsg:
-	free(m);
 err:
-	return NULL;
+	return -1;
 }
 
-ssize_t lrpc_socket_sendmsg(struct lrpc_socket *sock, struct msghdr *m, int flags)
+ssize_t socket_sendmsg(struct lrpc_socket *sock, struct msghdr *m, int flags)
 {
 	return sendmsg(sock->fd, m, flags);
 }

@@ -13,13 +13,9 @@
 # License along with the lrpc; if not, see
 # <http://www.gnu.org/licenses/>.
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
-
-find_package(Check REQUIRED)
-include_directories(${CHECK_INCLUDE_DIRS})
-link_directories(${CHECK_LIBRARY_DIRS})
-
-set(TEST_SOURCES check_lrpc.c 01core.c test_common.h)
-
-add_executable(check_lrpc ${TEST_SOURCES})
-target_link_libraries(check_lrpc lrpc ${CHECK_LIBRARIES})
+cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
+include_directories(../../src)
+add_executable(async-call-provider provider.c)
+add_executable(async-call-invoker invoker.c)
+target_link_libraries(async-call-provider lrpc)
+target_link_libraries(async-call-invoker lrpc)

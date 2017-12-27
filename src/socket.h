@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <limits.h>
 #include <sys/socket.h>
-#include <linux/un.h>
+#include <sys/un.h>
 
 struct lrpc_socket;
 struct lrpc_packet;
@@ -28,18 +28,8 @@ struct lrpc_msg_call;
 
 #define LRPC_MAX_PACKET_SIZE (512)
 
-struct lrpc_endpoint
-{
-	struct lrpc_socket *sock;
-	socklen_t addr_len;
-	struct sockaddr_un addr;
-};
-
-struct lrpc_socket
-{
-	int fd;
-	struct lrpc_endpoint endpoint;
-};
+#include "endpoint.h"
+#include "interface.h"
 
 #include "msg.h"
 
@@ -50,17 +40,15 @@ struct lrpc_packet
 	struct msghdr msgh;
 	struct iovec iov;
 	size_t payload_len;
-	char payload[];
+	char payload[LRPC_MAX_PACKET_SIZE];
 };
 
 
-void endpoint_init(struct lrpc_endpoint *endpoint, struct lrpc_socket *sock, const char *name, size_t name_len);
+int socket_recvmsg(struct lrpc_socket *sock, struct lrpc_packet *pkt, int flags);
 
-void lrpc_socket_freemsg(struct lrpc_packet *m);
+ssize_t socket_sendmsg(struct lrpc_socket *sock, struct msghdr *m, int flags);
 
-struct lrpc_packet *lrpc_socket_recvmsg(struct lrpc_socket *sock, int flags);
-
-void lrpc_socket_init(struct lrpc_socket *sock, const char *name, size_t name_len);
+void lrpc_socket_init(struct lrpc_socket *sock, struct lrpc_interface *inf, const char *name, size_t name_len);
 
 int lrpc_socket_open(struct lrpc_socket *sock);
 

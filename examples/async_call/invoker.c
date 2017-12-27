@@ -12,40 +12,48 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the lrpc; if not, see
    <http://www.gnu.org/licenses/>.  */
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <interface.h>
 #include <stdio.h>
+#include <assert.h>
 #include "common.h"
+
+int async_call_callback(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
+{
+	ctx->user_data = (void *) 1;
+}
 
 int main()
 {
 	int rc;
-	char buf[10];
 	struct lrpc_interface inf;
-	struct lrpc_endpoint provider;
-	ssize_t ret_size;
+	struct lrpc_packet pkt_buffer;
+	struct lrpc_endpoint peer;
+	ssize_t size;
 
 	lrpc_init(&inf, NAME_INVOKER, sizeof(NAME_INVOKER));
 
 	lrpc_start(&inf);
 
-	rc = lrpc_connect(&inf, &provider, NAME_PROVIDER, sizeof(NAME_PROVIDER));
-	if (rc < 0) {
-		perror("lrpc_connect");
-		abort();
-	}
+	rc = lrpc_connect(&inf, &peer, NAME_PROVIDER, sizeof(NAME_PROVIDER));
+	assert(rc >= 0);
 
-	ret_size = lrpc_call(&provider, "echo", "hello", 6, buf, sizeof(buf));
-	if (ret_size < 0) {
-		perror("lrpc_call");
-		abort();
-	}
+	struct lrpc_async_call_ctx ctx;
+	ctx.user_data = NULL;
+	ctx.method = "echo";
+	ctx.args = "hello";
+	ctx.args_len = 6;
+	ctx.cb = async_call_callback;
 
-	if (strncmp(buf, "hello", ret_size) != 0) {
-		fprintf(stderr, "result mismatched!\n");
-		return 1;
-	}
+	rc = lrpc_call_async(&peer, &ctx);
+	assert(rc >= 0);
+
+	rc = lrpc_poll(&inf, &pkt_buffer);
+	assert(rc >= 0);
+
+	assert(ctx.user_data == (void *) 1);
 
 	lrpc_stop(&inf);
 

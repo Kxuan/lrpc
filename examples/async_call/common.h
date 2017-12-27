@@ -13,15 +13,9 @@
    License along with the lrpc; if not, see
    <http://www.gnu.org/licenses/>.  */
 
+#ifndef LRPC_COMMON_H
+#define LRPC_COMMON_H
+#define NAME_PROVIDER "provider"
+#define NAME_INVOKER "invoker"
 
-#include <unistd.h>
-#include <sys/socket.h>
-#include <assert.h>
-#include <string.h>
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <utlist.h>
-#include "config.h"
-
-#include "lrpc.h"
+#endif //LRPC_COMMON_H

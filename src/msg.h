@@ -17,6 +17,7 @@
 #define LRPC_MSG_H
 
 #include <stdint.h>
+#include <lrpc.h>
 
 enum lrpc_msg_types
 {
@@ -27,7 +28,7 @@ enum lrpc_msg_types
 
 struct lrpc_msg_head
 {
-	uintptr_t cookie;
+	lrpc_cookie_t cookie;
 	uint16_t body_size;
 	uint8_t type; //enum lrpc_msg_types
 };
@@ -39,7 +40,6 @@ enum lrpc_call_ret_status
 	LRPC_RETST_DONE
 };
 
-#include "method.h"
 struct lrpc_msg_call
 {
 	struct lrpc_msg_head head;
@@ -66,11 +66,11 @@ union lrpc_msg_ctx
 	struct lrpc_ctx_call call;
 };
 
-#include "interface.h"
-#include "socket.h"
-int lrpc_return_async(const void *user_ctx);
+int lrpc_return_async(const struct lrpc_packet *pkt, struct lrpc_async_return_ctx *ctx);
 
-int lrpc_return(const void *ctx, const void *ret, size_t ret_size);
+int lrpc_return_finish(struct lrpc_async_return_ctx *ctx, const void *ret, size_t ret_size);
+
+int lrpc_return(const struct lrpc_packet *pkt, const void *ret, size_t ret_size);
 
 int lrpc_msg_feed(struct lrpc_interface *inf, struct lrpc_packet *msg);
 

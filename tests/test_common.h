@@ -1,4 +1,4 @@
-/* Copyright (C) 2017 kXuan <kxuanobj@gmail.com>
+/*Copyright (C) 2017 kXuan <kxuanobj@gmail.com>
 
    This file is part of the lrpc.
    The lrpc is free software; you can redistribute it and/or
@@ -11,17 +11,14 @@
    Lesser General Public License for more details.
    You should have received a copy of the GNU Lesser General Public
    License along with the lrpc; if not, see
-   <http://www.gnu.org/licenses/>.  */
+   <http://www.gnu.org/licenses/>.*/
 
+#ifndef LRPC_TEST_COMMON_H
+#define LRPC_TEST_COMMON_H
 
-#ifndef LRPC_LRPC_H
-#define LRPC_LRPC_H
+#define NAME_PROVIDER "provider"
+#define NAME_INVOKER "invoker"
+#define TEST_METHOD "echo"
+#define TEST_CONTENT "hello"
 
-#include <stdint.h>
-#include <limits.h>
-#include <assert.h>
-
-#include "method.h"
-
-#define LRPC_MAX_ARGS_LENGTH UINT16_MAX
-#endif //LRPC_LRPC_H
+#endif //LRPC_TEST_COMMON_H

@@ -14,108 +14,26 @@
    <http://www.gnu.org/licenses/>.  */
 
 
-#include <linux/un.h>
-#include <stdlib.h>
+#include <sys/un.h>
+#include <utlist.h>
+#include <lrpc.h>
 #include <stdio.h>
-#include <errno.h>
-#include <string.h>
 #include "interface.h"
 #include "socket.h"
 #include "msg.h"
-#include "lrpc.h"
 
-static int lrpc_invoke(struct lrpc_endpoint *endpoint, struct msghdr *msg, struct msghdr *rmsg)
+int inf_async_call(struct lrpc_interface *inf, struct lrpc_async_call_ctx *ctx, struct msghdr *msg)
 {
 	ssize_t size;
-	size = sendmsg(endpoint->sock->fd, msg, MSG_NOSIGNAL);
-	if (size < 0) {
-		return -1;
+	DL_APPEND(inf->async_call_list, ctx);
+	size = socket_sendmsg(&inf->sock, msg, 0);
+	if (size <= 0) {
+		goto err;
 	}
-
-	struct lrpc_msg_head *send_head = (struct lrpc_msg_head *) (msg->msg_iov[MSGIOV_HEAD].iov_base),
-		*recv_head = (struct lrpc_msg_head *) (rmsg->msg_iov[MSGIOV_HEAD].iov_base);
-	size = recvmsg(endpoint->sock->fd, rmsg, MSG_NOSIGNAL);
-	if (size < 0) {
-		return -1;
-	}
-
-	if (size < sizeof(struct lrpc_msg_head)) {
-		fprintf(stderr, "protocol mismatched.\n");
-		abort();
-	}
-
-	if (memcmp(rmsg->msg_name, &endpoint->addr, endpoint->addr_len) != 0) {
-		fprintf(stderr, "call/return from multi peer is not support yet.\n");
-		abort();
-	}
-
-	if (recv_head->cookie != send_head->cookie) {
-		fprintf(stderr, "Async call/return is not support yet.\n");
-		abort();
-	}
-
 	return 0;
-}
-
-int lrpc_call(struct lrpc_endpoint *endpoint,
-              const char *method_name, const void *args, size_t args_len,
-              void *rc_ptr, size_t rc_size)
-{
-	int rc;
-	size_t method_len;
-	struct sockaddr_un addr;
-	struct msghdr msg, rmsg;
-	struct iovec iov[MSGIOV_MAX], riov[MSGIOV_MAX];
-	struct lrpc_msg_call call;
-	struct lrpc_msg_return returns;
-
-	if (args_len > LRPC_MAX_ARGS_LENGTH) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	method_len = strlen(method_name);
-	if (method_len > LRPC_METHOD_NAME_MAX) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	call.head.cookie = (uintptr_t) &call;
-	call.head.type = LRPC_MSGTYP_CALL;
-	call.head.body_size = args_len;
-	call.method_len = (uint8_t) method_len;
-	call.args_len = (uint16_t) args_len;
-	memcpy(call.method, method_name, method_len);
-
-	iov[MSGIOV_HEAD].iov_base = &call;
-	iov[MSGIOV_HEAD].iov_len = sizeof(call);
-	iov[MSGIOV_BODY].iov_base = (void *) args;
-	iov[MSGIOV_BODY].iov_len = args_len;
-
-	msg.msg_name = &endpoint->addr;
-	msg.msg_namelen = endpoint->addr_len;
-	msg.msg_iov = iov;
-	msg.msg_iovlen = sizeof(iov) / sizeof(*iov);
-	msg.msg_control = NULL;
-	msg.msg_controllen = 0;
-	msg.msg_flags = 0;
-
-	riov[MSGIOV_HEAD].iov_base = &returns;
-	riov[MSGIOV_HEAD].iov_len = sizeof(returns);
-	riov[MSGIOV_BODY].iov_base = rc_ptr;
-	riov[MSGIOV_BODY].iov_len = rc_size;
-
-	rmsg.msg_name = &addr;
-	rmsg.msg_namelen = sizeof(addr);
-	rmsg.msg_iov = riov;
-	rmsg.msg_iovlen = sizeof(iov) / sizeof(*iov);
-	rmsg.msg_control = NULL;
-	rmsg.msg_controllen = 0;
-	rmsg.msg_flags = 0;
-
-	rc = lrpc_invoke(endpoint, &msg, &rmsg);
-
-	return rc;
+err:
+	DL_DELETE(inf->async_call_list, ctx);
+	return -1;
 }
 
 int lrpc_connect(struct lrpc_interface *inf,
@@ -125,14 +43,15 @@ int lrpc_connect(struct lrpc_interface *inf,
 	return 0;
 }
 
-int lrpc_register_method(struct lrpc_interface *inf, struct lrpc_method *method)
+int lrpc_method(struct lrpc_interface *inf, struct lrpc_method *method)
 {
 	return method_register(&inf->all_methods, method);
 }
 
 void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len)
 {
-	lrpc_socket_init(&inf->sock, name, name_len);
+	inf->async_call_list = NULL;
+	lrpc_socket_init(&inf->sock, inf, name, name_len);
 	method_table_init(&inf->all_methods);
 }
 
@@ -146,15 +65,14 @@ int lrpc_stop(struct lrpc_interface *inf)
 	lrpc_socket_close(&inf->sock);
 }
 
-int lrpc_poll(struct lrpc_interface *inf)
+int lrpc_poll(struct lrpc_interface *inf, struct lrpc_packet *msg)
 {
-	struct lrpc_packet *msg;
-	msg = lrpc_socket_recvmsg(&inf->sock, 0);
-	if (!msg) {
+	int rc;
+	rc = socket_recvmsg(&inf->sock, msg, 0);
+	if (rc < 0) {
 		return -1;
 	}
 
-	lrpc_msg_feed(inf, msg);
-
-	return 0;
+	rc = lrpc_msg_feed(inf, msg);
+	return rc;
 }

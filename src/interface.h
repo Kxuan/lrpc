@@ -29,27 +29,19 @@ enum msgiov_types
 #include "socket.h"
 #include "method.h"
 
-struct lrpc_interface
-{
-	struct lrpc_socket sock;
-	struct method_table all_methods;
-};
-
 void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len);
 
 int lrpc_start(struct lrpc_interface *inf);
 
 int lrpc_stop(struct lrpc_interface *inf);
 
-int lrpc_poll(struct lrpc_interface *inf);
+int lrpc_poll(struct lrpc_interface *inf, struct lrpc_packet *buffer);
 
-int lrpc_register_method(struct lrpc_interface *inf, struct lrpc_method *method);
+int lrpc_method(struct lrpc_interface *inf, struct lrpc_method *method);
 
 int lrpc_connect(struct lrpc_interface *inf,
                  struct lrpc_endpoint *endpoint, const char *name, size_t name_len);
 
-int lrpc_call(struct lrpc_endpoint *endpoint,
-              const char *method_name, const void *args, size_t args_len,
-              void *rc_ptr, size_t rc_size);
+int inf_async_call(struct lrpc_interface *inf, struct lrpc_async_call_ctx *ctx, struct msghdr *msg);
 
 #endif //LRPC_INTERFACE_H

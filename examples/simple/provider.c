@@ -20,10 +20,10 @@
 #include "common.h"
 
 int sync_rpc_echo(void *user_data,
-                  const void *ctx,
+                  const struct lrpc_packet *pkt,
                   void *args, size_t args_len)
 {
-   	lrpc_return(ctx, args, args_len);
+	lrpc_return_async(pkt, user_data);
 
 	return 0;
 }
@@ -33,11 +33,12 @@ int main()
 	int rc;
 	struct lrpc_interface inf;
 	struct lrpc_method method;
-
+	struct lrpc_packet pkt_buffer;
+	struct lrpc_async_return_ctx ctx;
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 
-	lrpc_method_init(&method, "echo", sync_rpc_echo, main);
-	rc = lrpc_register_method(&inf, &method);
+	lrpc_method_init(&method, "echo", sync_rpc_echo, &ctx);
+	rc = lrpc_method(&inf, &method);
 	if (rc < 0) {
 		perror("lrpc_register_method");
 		abort();
@@ -49,12 +50,14 @@ int main()
 		abort();
 	}
 
-	rc = lrpc_poll(&inf);
+	rc = lrpc_poll(&inf, &pkt_buffer);
 	if (rc < 0) {
 		perror("lrpc_poll");
 		abort();
 	}
-
+	
+	lrpc_return_finish(&ctx, "content", 7);
+	
 	lrpc_stop(&inf);
 
 	return 0;
