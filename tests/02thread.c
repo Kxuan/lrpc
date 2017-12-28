@@ -236,7 +236,7 @@ static void run_invoker()
 		} else {
 			thread_list[i] = start_async_invoker(peer + (i % INVOKER_COUNT));
 		}
-		ck_assert_ptr_ne(thread_list[i], NULL);
+		ck_assert_int_ne(thread_list[i], 0);
 	}
 
 	for (i = 0; i < THREAD_COUNT; ++i) {
