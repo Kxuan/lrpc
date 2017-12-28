@@ -287,14 +287,30 @@ START_TEST(test_thread)
 	ck_assert_int_eq(counter, THREAD_COUNT * TEST_COUNT);
 END_TEST
 
-TCase *create_tcase_thread()
+int main()
 {
 	TCase *tc;
 
-	/* Core test case */
+	int number_failed;
+	Suite *s;
+	SRunner *sr;
+
+	s = suite_create(TEST_NAME);
+
+	/* Multi thread test case */
 	tc = tcase_create("Multi-thread");
 	tcase_set_timeout(tc, 5);
 
 	tcase_add_test(tc, test_thread);
-	return tc;
+
+
+	suite_add_tcase(s, tc);
+
+	sr = srunner_create(s);
+	srunner_run_all(sr, CK_NORMAL);
+
+	number_failed = srunner_ntests_failed(sr);
+	srunner_free(sr);
+
+	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

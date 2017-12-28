@@ -20,6 +20,8 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 set(CMAKE_C_STANDARD 99)
 
+include(CTest)
+
 ## Configure lrpc
 
 set(LRPC_MSG_NAME_PREFIX "LRPC\\x01" CACHE STRING "The prefix of msg_name.")
@@ -36,4 +38,3 @@ add_subdirectory(tests)
 add_subdirectory(examples)
 
 enable_testing()
-add_test(NAME check_lrpc COMMAND check_lrpc)
