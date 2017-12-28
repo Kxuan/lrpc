@@ -12,48 +12,45 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the lrpc; if not, see
    <http://www.gnu.org/licenses/>.  */
-
 #include <stdlib.h>
 #include <string.h>
 #include <interface.h>
 #include <stdio.h>
+#include <pthread.h>
+#include <assert.h>
 #include "common.h"
 
-int sync_rpc_echo(void *user_data,
-                  const struct lrpc_packet *pkt,
-                  void *args, size_t args_len)
+void callback(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
-	lrpc_return(pkt, args, args_len);
-	return 0;
+	if (strncmp(ret_ptr, "hello", ret_size) != 0) {
+		fprintf(stderr, "result mismatched!\n");
+		abort();
+	}
+	printf("got result: %*s\n", (int) ret_size, (char *) ret_ptr);
 }
 
 int main()
 {
 	int rc;
+	struct lrpc_packet pkt_buf;
 	struct lrpc_interface inf;
-	struct lrpc_method method;
-	struct lrpc_packet pkt_buffer;
-	
-	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
+	struct lrpc_endpoint provider;
+	struct lrpc_async_call_ctx call_ctx;
+	pthread_t thd;
 
-	lrpc_method_init(&method, "echo", sync_rpc_echo, NULL);
-	rc = lrpc_method(&inf, &method);
-	if (rc < 0) {
-		perror("lrpc_register_method");
-		abort();
-	}
+	lrpc_init(&inf, NAME_INVOKER, sizeof(NAME_INVOKER));
 
 	rc = lrpc_start(&inf);
-	if (rc < 0) {
-		perror("lrpc_start");
-		abort();
-	}
+	assert(rc >= 0);
 
-	rc = lrpc_poll(&inf, &pkt_buffer);
-	if (rc < 0) {
-		perror("lrpc_poll");
-		abort();
-	}
+	rc = lrpc_connect(&inf, &provider, NAME_PROVIDER, sizeof(NAME_PROVIDER));
+	assert(rc >= 0);
+
+	rc = lrpc_call_async(&provider, &call_ctx, "echo", "hello", 6, callback);
+	assert(rc >= 0);
+
+	rc = lrpc_poll(&inf, &pkt_buf);
+	assert(rc >= 0);
 
 	lrpc_stop(&inf);
 

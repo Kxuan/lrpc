@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <pthread.h>
 #include "config.h"
 #include "interface.h"
 
@@ -38,115 +39,76 @@ void endpoint_init(struct lrpc_endpoint *endpoint, struct lrpc_socket *sock, con
 	endpoint->addr_len = (socklen_t) (offsetof(struct sockaddr_un, sun_path) + (p - endpoint->addr.sun_path));
 }
 
-static ssize_t lrpc_invoke(struct lrpc_endpoint *endpoint, struct msghdr *msg, struct msghdr *rmsg)
+struct sync_call_context
 {
-	ssize_t size;
-	size = socket_sendmsg(endpoint->sock, msg, MSG_NOSIGNAL);
-	if (size < 0) {
-		return -1;
-	}
+	int done;
+	pthread_mutex_t lock;
+	pthread_cond_t cond;
+	void *ret_ptr;
+	size_t ret_size;
+	int err_code;
+};
 
-	struct lrpc_msg_head *send_head = (struct lrpc_msg_head *) (msg->msg_iov[MSGIOV_HEAD].iov_base),
-		*recv_head = (struct lrpc_msg_head *) (rmsg->msg_iov[MSGIOV_HEAD].iov_base);
-	size = recvmsg(endpoint->sock->fd, rmsg, MSG_NOSIGNAL);
-	if (size < 0) {
-		return -1;
-	}
-
-	if (size < sizeof(struct lrpc_msg_head)) {
-		fprintf(stderr, "protocol mismatched.\n");
-		abort();
-	}
-
-	if (memcmp(rmsg->msg_name, &endpoint->addr, endpoint->addr_len) != 0) {
-		fprintf(stderr, "call/return from multi peer is not support yet.\n");
-		abort();
-	}
-
-	if (recv_head->cookie != send_head->cookie) {
-		fprintf(stderr, "Async call/return is not support yet.\n");
-		abort();
-	}
-
-	return size;
-}
-
-static int build_call_msg(struct lrpc_endpoint *endpoint,
-                          struct lrpc_msg_call *call,
-                          struct msghdr *msg,
-                          struct iovec iov[MSGIOV_MAX],
-                          const char *method_name,
-                          const void *args, size_t args_len)
+static void sync_call_finish(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
-	size_t method_len;
-
-	method_len = strlen(method_name);
-	if (method_len > LRPC_METHOD_NAME_MAX) {
-		errno = EINVAL;
-		return -1;
+	struct sync_call_context *sync_ctx = ctx->user_data;
+	size_t copy_size;
+	pthread_mutex_lock(&sync_ctx->lock);
+	if (err_code != 0) {
+		sync_ctx->err_code = err_code;
+	} else {
+		copy_size = ret_size > sync_ctx->ret_size ? sync_ctx->ret_size : ret_size;
+		memcpy(sync_ctx->ret_ptr, ret_ptr, copy_size);
+		sync_ctx->ret_size = copy_size;
 	}
-
-	call->head.cookie = (lrpc_cookie_t) call;
-	call->head.type = LRPC_MSGTYP_CALL;
-	call->head.body_size = (uint16_t) args_len;
-	call->method_len = (uint8_t) method_len;
-	call->args_len = (uint16_t) args_len;
-	memcpy(call->method, method_name, method_len);
-
-	iov[MSGIOV_HEAD].iov_base = call;
-	iov[MSGIOV_HEAD].iov_len = sizeof(*call);
-	iov[MSGIOV_BODY].iov_base = (void *) args;
-	iov[MSGIOV_BODY].iov_len = args_len;
-
-	msg->msg_name = &endpoint->addr;
-	msg->msg_namelen = endpoint->addr_len;
-	msg->msg_iov = iov;
-	msg->msg_iovlen = MSGIOV_MAX;
-	msg->msg_control = NULL;
-	msg->msg_controllen = 0;
-	msg->msg_flags = 0;
-
-	return 0;
+	sync_ctx->done = 1;
+	pthread_cond_broadcast(&sync_ctx->cond);
+	pthread_mutex_unlock(&sync_ctx->lock);
 }
 
 ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
                   const char *method_name, const void *args, size_t args_len,
                   void *ret_ptr, size_t ret_size)
 {
+	int rc = 0;
 	ssize_t size;
-	struct sockaddr_un addr;
-	struct msghdr msg, rmsg;
-	struct iovec iov[MSGIOV_MAX], riov[MSGIOV_MAX];
-	struct lrpc_msg_call call;
-	struct lrpc_msg_return returns;
+	struct lrpc_async_call_ctx ctx;
+	struct sync_call_context sync_ctx;
 
-	if (args_len > LRPC_MAX_ARGS_LENGTH) {
-		errno = EINVAL;
-		return -1;
+	pthread_mutex_init(&sync_ctx.lock, NULL);
+	pthread_cond_init(&sync_ctx.cond, NULL);
+	sync_ctx.ret_ptr = ret_ptr;
+	sync_ctx.ret_size = ret_size;
+	sync_ctx.err_code = 0;
+	sync_ctx.done = 0;
+	ctx.user_data = &sync_ctx;
+	ctx.cb = sync_call_finish;
+
+	pthread_mutex_lock(&sync_ctx.lock);
+	rc = lrpc_call_async(endpoint, &ctx, method_name, args, args_len, sync_call_finish);
+	if (rc == 0) {
+		while (sync_ctx.done == 0) {
+			pthread_cond_wait(&sync_ctx.cond, &sync_ctx.lock);
+		}
+	}
+	pthread_mutex_unlock(&sync_ctx.lock);
+	pthread_mutex_destroy(&sync_ctx.lock);
+	pthread_cond_destroy(&sync_ctx.cond);
+
+	if (rc < 0) {
+		size = -2;
+	} else if (sync_ctx.err_code != 0) {
+		size = -1;
+		errno = sync_ctx.err_code;
+	} else {
+		size = sync_ctx.ret_size;
 	}
 
-	if (build_call_msg(endpoint, &call, &msg, iov, method_name, args, args_len) < 0) {
-		return -1;
-	}
-
-	riov[MSGIOV_HEAD].iov_base = &returns;
-	riov[MSGIOV_HEAD].iov_len = sizeof(returns);
-	riov[MSGIOV_BODY].iov_base = ret_ptr;
-	riov[MSGIOV_BODY].iov_len = ret_size;
-
-	rmsg.msg_name = &addr;
-	rmsg.msg_namelen = sizeof(addr);
-	rmsg.msg_iov = riov;
-	rmsg.msg_iovlen = sizeof(iov) / sizeof(*iov);
-	rmsg.msg_control = NULL;
-	rmsg.msg_controllen = 0;
-	rmsg.msg_flags = 0;
-
-	size = lrpc_invoke(endpoint, &msg, &rmsg);
-	return size - sizeof(struct lrpc_msg_return);
+	return size;
 }
 
-int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *ctx)
+int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *ctx, const char *method, const void *args,
+                    size_t args_len, lrpc_async_callback cb)
 {
 	int rc;
 	struct lrpc_interface *inf;
@@ -156,17 +118,18 @@ int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *
 
 	assert(endpoint);
 	assert(ctx);
-	assert(ctx->cb);
-	assert(ctx->method);
-	assert(ctx->args_len == 0 || ctx->args);
+	assert(cb);
+	assert(method);
+	assert(args_len == 0 || args);
 
-	if (build_call_msg(endpoint, &call, &msg, iov, ctx->method, ctx->args, ctx->args_len) < 0) {
+	ctx->cb = cb;
+
+	if (msg_build_call(endpoint, &call, &msg, iov, method, args, args_len) < 0) {
 		goto err;
 	}
 	ctx->cookie = (lrpc_cookie_t) &call;
 
 	inf = endpoint->sock->inf;
-
 
 	rc = inf_async_call(inf, ctx, &msg);
 	if (rc < 0) {

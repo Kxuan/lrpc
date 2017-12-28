@@ -19,19 +19,44 @@
 #include <check.h>
 #include <lrpc.h>
 #include <stdio.h>
+#include <errno.h>
+#include <pthread.h>
 #include "../src/msg.h"
 #include "../src/socket.h"
 #include "test_common.h"
 
-int sync_rpc_echo(void *user_data,
-                  const struct lrpc_packet *pkt,
-                  void *args, size_t args_len)
+void *thread_poll_routine(void *user_data)
+{
+	void *rc = NULL;
+	struct lrpc_interface *inf = user_data;
+	struct lrpc_packet rcv_buf;
+
+	if (lrpc_poll(inf, &rcv_buf) < 0) {
+		rc = (void *) (uintptr_t) errno;
+	}
+	return rc;
+}
+
+int sync_rpc(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, size_t args_len)
 {
 	ck_assert_str_eq(args, TEST_CONTENT);
 	ck_assert_int_eq(args_len, sizeof(TEST_CONTENT));
 
-	lrpc_return(pkt, args, args_len);
+	lrpc_return(ctx, args, args_len);
 
+	return 0;
+}
+
+int async_rpc(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, size_t args_len)
+{
+	struct lrpc_async_return_ctx *async_ctx = user_data;
+	int rc;
+	ck_assert_ptr_ne(user_data, NULL);
+	ck_assert_str_eq(args, TEST_CONTENT);
+	ck_assert_int_eq(args_len, sizeof(TEST_CONTENT));
+
+	rc = lrpc_return_async(ctx, async_ctx);
+	ck_assert_int_ge(rc, 0);
 	return 0;
 }
 
@@ -43,7 +68,7 @@ void sync_provider(int sigfd)
 	struct lrpc_packet pkt_buffer;
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
-	lrpc_method_init(&method, TEST_METHOD, sync_rpc_echo, NULL);
+	lrpc_method_init(&method, TEST_METHOD, sync_rpc, NULL);
 
 	rc = lrpc_method(&inf, &method);
 	ck_assert_int_ge(rc, 0);
@@ -63,6 +88,7 @@ void sync_invoker(int sigfd)
 	char buf[sizeof(TEST_CONTENT)];
 	struct lrpc_interface inf;
 	struct lrpc_endpoint peer;
+	pthread_t thread;
 	ssize_t size;
 
 	lrpc_init(&inf, NAME_INVOKER, sizeof(NAME_INVOKER));
@@ -75,47 +101,16 @@ void sync_invoker(int sigfd)
 	rc = lrpc_connect(&inf, &peer, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 	ck_assert_int_ge(rc, 0);
 
-	rc = lrpc_call(&peer, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), buf, sizeof(buf));
+	rc = pthread_create(&thread, NULL, thread_poll_routine, &inf);
+	ck_assert_int_ge(rc, 0);
+
+	rc = (int) lrpc_call(&peer, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), buf, sizeof(buf));
+	ck_assert_int_ge(rc, 0);
+
+	rc = pthread_join(thread, NULL);
 	ck_assert_int_ge(rc, 0);
 
 	ck_assert_str_eq(buf, TEST_CONTENT);
-}
-
-START_TEST(test_01sync)
-	int rc;
-	pid_t pid;
-	int fds[2];
-
-	rc = pipe(fds);
-
-	ck_assert_int_ge(rc, 0);
-
-	pid = fork();
-	ck_assert_int_ge(pid, 0);
-
-	if (pid == 0) {
-		sync_provider(fds[1]);
-		exit(0);
-	} else {
-		sync_invoker(fds[0]);
-		rc = waitpid(pid, NULL, 0);
-		ck_assert_int_eq(rc, pid);
-	}
-END_TEST
-
-int async_rpc(void *user_data,
-              const struct lrpc_packet *pkt,
-              void *args, size_t args_len)
-{
-	struct lrpc_async_return_ctx *ctx = user_data;
-	int rc;
-	ck_assert_ptr_ne(user_data, NULL);
-	ck_assert_str_eq(args, TEST_CONTENT);
-	ck_assert_int_eq(args_len, sizeof(TEST_CONTENT));
-
-	rc = lrpc_return_async(pkt, ctx);
-	ck_assert_int_ge(rc, 0);
-	return 0;
 }
 
 void async_provider(int sigfd)
@@ -142,28 +137,6 @@ void async_provider(int sigfd)
 	rc = lrpc_return_finish(&ctx, TEST_CONTENT, sizeof(TEST_CONTENT));
 	ck_assert_int_ge(rc, 0);
 }
-
-START_TEST(test_02async_return)
-	int rc;
-	pid_t pid;
-	int fds[2];
-
-	rc = pipe(fds);
-
-	ck_assert_int_ge(rc, 0);
-
-	pid = fork();
-	ck_assert_int_ge(pid, 0);
-
-	if (pid == 0) {
-		async_provider(fds[1]);
-		exit(0);
-	} else {
-		sync_invoker(fds[0]);
-		rc = waitpid(pid, NULL, 0);
-		ck_assert_int_eq(rc, pid);
-	}
-END_TEST
 
 void async_call_callback(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
@@ -193,21 +166,59 @@ void async_invoker(int sigfd)
 	ck_assert_int_ge(rc, 0);
 
 	struct lrpc_async_call_ctx ctx;
-	ctx.user_data = NULL;
-	ctx.method = TEST_METHOD;
-	ctx.args = TEST_CONTENT;
-	ctx.args_len = sizeof(TEST_CONTENT);
-	ctx.cb = async_call_callback;
-
-	rc = lrpc_call_async(&peer, &ctx);
+	rc = lrpc_call_async(&peer, &ctx, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), async_call_callback);
 	ck_assert_int_ge(rc, 0);
 
 	rc = lrpc_poll(&inf, &pkt_buffer);
 	ck_assert_int_ge(rc, 0);
 
-	ck_assert_ptr_eq(ctx.user_data, 1);
+	ck_assert_ptr_eq(ctx.user_data, (void *) 1);
 
 }
+
+START_TEST(test_01sync)
+	int rc;
+	pid_t pid;
+	int fds[2];
+
+	rc = pipe(fds);
+
+	ck_assert_int_ge(rc, 0);
+
+	pid = fork();
+	ck_assert_int_ge(pid, 0);
+
+	if (pid == 0) {
+		sync_provider(fds[1]);
+		exit(0);
+	} else {
+		sync_invoker(fds[0]);
+		rc = waitpid(pid, NULL, 0);
+		ck_assert_int_eq(rc, pid);
+	}
+END_TEST
+
+START_TEST(test_02async_return)
+	int rc;
+	pid_t pid;
+	int fds[2];
+
+	rc = pipe(fds);
+
+	ck_assert_int_ge(rc, 0);
+
+	pid = fork();
+	ck_assert_int_ge(pid, 0);
+
+	if (pid == 0) {
+		async_provider(fds[1]);
+		exit(0);
+	} else {
+		sync_invoker(fds[0]);
+		rc = waitpid(pid, NULL, 0);
+		ck_assert_int_eq(rc, pid);
+	}
+END_TEST
 
 START_TEST(test_03async_call)
 	int rc;

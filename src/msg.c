@@ -18,10 +18,49 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <libut.h>
+#include <pthread.h>
 #include "lrpc-internal.h"
 #include "msg.h"
 #include "socket.h"
 
+
+int msg_build_call(struct lrpc_endpoint *endpoint,
+                   struct lrpc_msg_call *call,
+                   struct msghdr *msg,
+                   struct iovec iov[MSGIOV_MAX],
+                   const char *method_name,
+                   const void *args, size_t args_len)
+{
+	size_t method_len;
+
+	method_len = strlen(method_name);
+	if (method_len > LRPC_METHOD_NAME_MAX) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	call->head.cookie = (lrpc_cookie_t) call;
+	call->head.type = LRPC_MSGTYP_CALL;
+	call->head.body_size = (uint16_t) args_len;
+	call->method_len = (uint8_t) method_len;
+	call->args_len = (uint16_t) args_len;
+	memcpy(call->method, method_name, method_len);
+
+	iov[MSGIOV_HEAD].iov_base = call;
+	iov[MSGIOV_HEAD].iov_len = sizeof(*call);
+	iov[MSGIOV_BODY].iov_base = (void *) args;
+	iov[MSGIOV_BODY].iov_len = args_len;
+
+	msg->msg_name = &endpoint->addr;
+	msg->msg_namelen = endpoint->addr_len;
+	msg->msg_iov = iov;
+	msg->msg_iovlen = MSGIOV_MAX;
+	msg->msg_control = NULL;
+	msg->msg_controllen = 0;
+	msg->msg_flags = 0;
+
+	return 0;
+}
 
 static int lrpc_do_return(struct lrpc_socket *sock,
                           const struct sockaddr_un *addr, socklen_t addr_len,
@@ -71,12 +110,14 @@ static int lrpc_return_error(struct lrpc_socket *sock, struct lrpc_packet *pkt, 
 
 }
 
-int lrpc_return_async(const struct lrpc_packet *pkt, struct lrpc_async_return_ctx *async_ctx)
+int lrpc_return_async(const struct lrpc_callback_ctx *user_ctx, struct lrpc_async_return_ctx *async_ctx)
 {
-	struct lrpc_ctx_call *ctx;
+	struct lrpc_callback_ctx *ctx;
+	struct lrpc_packet *pkt;
 	struct lrpc_msg_call *call;
 
-	ctx = (struct lrpc_ctx_call *) pkt->context;
+	ctx = (struct lrpc_callback_ctx *) user_ctx;
+	pkt = ctx->pkt;
 	call = (struct lrpc_msg_call *) pkt->payload;
 
 	if (ctx->ret_status != LRPC_RETST_CALLBACK) {
@@ -102,14 +143,19 @@ int lrpc_return_finish(struct lrpc_async_return_ctx *ctx, const void *ret, size_
 	                      ret, ret_size);
 }
 
-int lrpc_return(const struct lrpc_packet *pkt, const void *ret, size_t ret_size)
+int lrpc_return(const struct lrpc_callback_ctx *user_ctx, const void *ret, size_t ret_size)
 {
 	int rc;
-	struct lrpc_ctx_call *ctx;
+	struct lrpc_callback_ctx *ctx;
+	struct lrpc_packet *pkt;
 	struct lrpc_msg_call *call;
 
+	assert(user_ctx != NULL);
+	assert(ret_size == 0 || ret != NULL);
+
+	ctx = (struct lrpc_callback_ctx *) user_ctx;
+	pkt = ctx->pkt;
 	call = (struct lrpc_msg_call *) pkt->payload;
-	ctx = (struct lrpc_ctx_call *) pkt->context;
 
 	if (ctx->ret_status != LRPC_RETST_CALLBACK) {
 		errno = EINVAL;
@@ -130,36 +176,36 @@ int lrpc_return(const struct lrpc_packet *pkt, const void *ret, size_t ret_size)
 }
 
 
-static int feed_msg_call(struct lrpc_interface *inf, struct lrpc_packet *msg)
+static int feed_msg_call(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 {
 	struct lrpc_method *method;
-	struct lrpc_ctx_call *ctx;
+	struct lrpc_callback_ctx ctx;
 	struct lrpc_msg_call *call;
 	int cb_returns;
 
-	ctx = (struct lrpc_ctx_call *) msg->context;
-	call = (struct lrpc_msg_call *) msg->payload;
+	call = (struct lrpc_msg_call *) pkt->payload;
 
-	if (msg->payload_len < sizeof(*call) ||
+	if (pkt->payload_len < sizeof(*call) ||
 	    call->method_len > sizeof(call->method) ||
-	    call->args_len != msg->payload_len - sizeof(*call)) {
+	    call->args_len != pkt->payload_len - sizeof(*call)) {
 		errno = EPROTO;
 		return -1;
 	}
 
 	method = method_find(&inf->all_methods, call->method, call->method_len);
 	if (method == NULL) {
-		lrpc_return_error(&inf->sock, msg, EOPNOTSUPP);
+		lrpc_return_error(&inf->sock, pkt, EOPNOTSUPP);
 		errno = EINVAL;
 		return -1;
 	}
 
-	ctx->inf = inf;
-	ctx->ret_status = LRPC_RETST_CALLBACK;
-	cb_returns = method->callback(method->user_data, msg, call + 1, msg->payload_len - sizeof(*call));
+	ctx.inf = inf;
+	ctx.pkt = pkt;
+	ctx.ret_status = LRPC_RETST_CALLBACK;
+	cb_returns = method->callback(method->user_data, &ctx, call + 1, pkt->payload_len - sizeof(*call));
 
-	if (ctx->ret_status == LRPC_RETST_CALLBACK) {
-		lrpc_return(msg, &cb_returns, sizeof(cb_returns));
+	if (ctx.ret_status == LRPC_RETST_CALLBACK) {
+		lrpc_return(&ctx, &cb_returns, sizeof(cb_returns));
 	}
 	return 0;
 }
@@ -180,17 +226,18 @@ static int feed_msg_return(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 	}
 
 	struct lrpc_async_call_ctx *ctx;
-	DL_FOREACH(inf->async_call_list, ctx) {
+	pthread_mutex_lock(&inf->lock_call_list);
+	DL_FOREACH(inf->call_list, ctx) {
 		if (ctx->cookie == returns->head.cookie) {
+			DL_DELETE(inf->call_list, ctx);
 			break;
 		}
 	}
-
+	pthread_mutex_unlock(&inf->lock_call_list);
 	if (!ctx) {
 		return -1;
 	}
 
-	DL_DELETE(inf->async_call_list, ctx);
 
 	if (returns->head.type == LRPC_MSGTYP_RETURN_ERROR) {
 		err_code = *(int *) (returns + 1);
@@ -201,6 +248,7 @@ static int feed_msg_return(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 
 	ctx->cb(ctx, err_code, ret_data, ret_len);
 	return 0;
+
 }
 
 int lrpc_msg_feed(struct lrpc_interface *inf, struct lrpc_packet *msg)

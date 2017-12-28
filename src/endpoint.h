@@ -27,6 +27,7 @@ ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
                   const char *method_name, const void *args, size_t args_len,
                   void *ret_ptr, size_t ret_size);
 
-int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *ctx);
+int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *ctx, const char *method, const void *args,
+                    size_t args_len, lrpc_async_callback cb);
 
 #endif //LRPC_ENDPOINT_H

@@ -18,6 +18,7 @@
 #include <utlist.h>
 #include <lrpc.h>
 #include <stdio.h>
+#include <pthread.h>
 #include "interface.h"
 #include "socket.h"
 #include "msg.h"
@@ -25,14 +26,18 @@
 int inf_async_call(struct lrpc_interface *inf, struct lrpc_async_call_ctx *ctx, struct msghdr *msg)
 {
 	ssize_t size;
-	DL_APPEND(inf->async_call_list, ctx);
+	pthread_mutex_lock(&inf->lock_call_list);
+	DL_APPEND(inf->call_list, ctx);
+	pthread_mutex_unlock(&inf->lock_call_list);
 	size = socket_sendmsg(&inf->sock, msg, 0);
 	if (size <= 0) {
 		goto err;
 	}
 	return 0;
 err:
-	DL_DELETE(inf->async_call_list, ctx);
+	pthread_mutex_lock(&inf->lock_call_list);
+	DL_DELETE(inf->call_list, ctx);
+	pthread_mutex_unlock(&inf->lock_call_list);
 	return -1;
 }
 
@@ -50,7 +55,8 @@ int lrpc_method(struct lrpc_interface *inf, struct lrpc_method *method)
 
 void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len)
 {
-	inf->async_call_list = NULL;
+	pthread_mutex_init(&inf->lock_call_list, NULL);
+	inf->call_list = NULL;
 	lrpc_socket_init(&inf->sock, inf, name, name_len);
 	method_table_init(&inf->all_methods);
 }

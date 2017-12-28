@@ -20,7 +20,7 @@
 #include <sys/un.h>
 #include <stdint.h>
 
-#define LRPC_MAX_ARGS_LENGTH UINT16_MAX
+#define LRPC_MAX_PACKET_SIZE (512)
 
 typedef uintptr_t lrpc_cookie_t;
 
@@ -40,9 +40,19 @@ struct lrpc_socket
 	struct lrpc_endpoint endpoint;
 };
 
-struct lrpc_packet;
 
-typedef int (*lrpc_method_cb)(void *user_data, const struct lrpc_packet *pkt, void *args, size_t args_len);
+struct lrpc_packet
+{
+	struct sockaddr_un addr;
+	struct msghdr msgh;
+	struct iovec iov;
+	size_t payload_len;
+	char payload[LRPC_MAX_PACKET_SIZE];
+};
+
+struct lrpc_callback_ctx;
+
+typedef int (*lrpc_method_cb)(void *user_data, const struct lrpc_callback_ctx *pkt, void *args, size_t args_len);
 
 struct lrpc_method
 {
@@ -52,7 +62,6 @@ struct lrpc_method
 
 	struct lrpc_method *prev, *next;
 };
-
 
 struct method_table
 {
@@ -64,8 +73,9 @@ struct lrpc_interface
 {
 	struct lrpc_socket sock;
 	struct method_table all_methods;
-	// todo MT-safe
-	struct lrpc_async_call_ctx *async_call_list;
+
+	pthread_mutex_t lock_call_list;
+	struct lrpc_async_call_ctx *call_list;
 };
 
 struct lrpc_async_return_ctx
@@ -81,10 +91,6 @@ typedef void (*lrpc_async_callback)(struct lrpc_async_call_ctx *ctx, int err_cod
 struct lrpc_async_call_ctx
 {
 	void *user_data;
-
-	const char *method;
-	const char *args;
-	size_t args_len;
 
 	lrpc_async_callback cb;
 

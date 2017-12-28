@@ -19,6 +19,13 @@
 #include <stdint.h>
 #include <lrpc.h>
 
+enum msgiov_types
+{
+	MSGIOV_HEAD,
+	MSGIOV_BODY,
+	MSGIOV_MAX
+};
+
 enum lrpc_msg_types
 {
 	LRPC_MSGTYP_CALL,
@@ -49,9 +56,10 @@ struct lrpc_msg_call
 	char method[LRPC_METHOD_NAME_MAX];
 };
 
-struct lrpc_ctx_call
+struct lrpc_callback_ctx
 {
 	struct lrpc_interface *inf;
+	struct lrpc_packet *pkt;
 	uint8_t ret_status;
 };
 
@@ -61,16 +69,18 @@ struct lrpc_msg_return
 	uint16_t returns_len;
 };
 
-union lrpc_msg_ctx
-{
-	struct lrpc_ctx_call call;
-};
+int msg_build_call(struct lrpc_endpoint *endpoint,
+                   struct lrpc_msg_call *call,
+                   struct msghdr *msg,
+                   struct iovec iov[MSGIOV_MAX],
+                   const char *method_name,
+                   const void *args, size_t args_len);
 
-int lrpc_return_async(const struct lrpc_packet *pkt, struct lrpc_async_return_ctx *ctx);
+int lrpc_return_async(const struct lrpc_callback_ctx *ctx, struct lrpc_async_return_ctx *async_ctx);
 
 int lrpc_return_finish(struct lrpc_async_return_ctx *ctx, const void *ret, size_t ret_size);
 
-int lrpc_return(const struct lrpc_packet *pkt, const void *ret, size_t ret_size);
+int lrpc_return(const struct lrpc_callback_ctx *ctx, const void *ret, size_t ret_size);
 
 int lrpc_msg_feed(struct lrpc_interface *inf, struct lrpc_packet *msg);
 

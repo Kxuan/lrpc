@@ -22,4 +22,4 @@ link_directories(${CHECK_LIBRARY_DIRS})
 set(TEST_SOURCES check_lrpc.c 01core.c test_common.h)
 
 add_executable(check_lrpc ${TEST_SOURCES})
-target_link_libraries(check_lrpc lrpc ${CHECK_LIBRARIES})
+target_link_libraries(check_lrpc lrpc pthread ${CHECK_LIBRARIES})

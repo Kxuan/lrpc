@@ -17,15 +17,6 @@
 #ifndef LRPC_INTERFACE_H
 #define LRPC_INTERFACE_H
 
-struct lrpc_interface;
-
-enum msgiov_types
-{
-	MSGIOV_HEAD,
-	MSGIOV_BODY,
-	MSGIOV_MAX
-};
-
 #include "socket.h"
 #include "method.h"
 
