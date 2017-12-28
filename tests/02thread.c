@@ -22,12 +22,15 @@
 #include <errno.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <sys/epoll.h>
 #include "../src/msg.h"
 #include "../src/socket.h"
 #include "test_common.h"
 
 #define THREAD_COUNT 100
-#define TEST_COUNT 200
+#define TEST_COUNT 2000
+#define INVOKER_COUNT 21
+
 pthread_mutex_t lock_counter = PTHREAD_MUTEX_INITIALIZER;
 static size_t counter = 0;
 
@@ -85,12 +88,32 @@ static void provider(int sigfd)
 static void *thread_poll_routine(void *user_data)
 {
 	int rc;
-	struct lrpc_interface *inf = user_data;
+	struct lrpc_interface *all_inf = user_data, *inf;
 	struct lrpc_packet rcv_buf;
-	while (1) {
-		rc = lrpc_poll(inf, &rcv_buf);
+	int epoll_fd;
+	int nevents;
+	int i;
+	struct epoll_event evt[INVOKER_COUNT];
+
+	epoll_fd = epoll_create(1);
+	ck_assert_int_ge(epoll_fd, 0);
+	for (i = 0; i < INVOKER_COUNT; ++i) {
+		evt[i].events = EPOLLIN;
+		evt[i].data.ptr = all_inf + i;
+
+		rc = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, all_inf[i].sock.fd, evt + i);
 		ck_assert_int_eq(rc, 0);
 	}
+
+	while (1) {
+		nevents = epoll_wait(epoll_fd, evt, sizeof(evt) / sizeof(*evt), -1);
+		for (i = 0; i < nevents; i++) {
+			inf = evt[i].data.ptr;
+			rc = lrpc_poll(inf, &rcv_buf);
+			ck_assert_int_eq(rc, 0);
+		}
+	}
+
 }
 
 static void *sync_invoker_routine(void *user_data)
@@ -175,17 +198,67 @@ static pthread_t start_async_invoker(struct lrpc_endpoint *peer)
 	return thread;
 }
 
+void init_invoker(struct lrpc_interface *inf, struct lrpc_endpoint *peer)
+{
+	int rc;
+	char invoker_name[sizeof(NAME_INVOKER) + 2 * sizeof(void *)];
+	int name_len;
+
+	name_len = snprintf(invoker_name, sizeof(invoker_name), "%s%p", NAME_INVOKER, inf);
+	lrpc_init(inf, invoker_name, (size_t) name_len);
+
+	rc = lrpc_start(inf);
+	ck_assert_int_eq(rc, 0);
+
+	rc = lrpc_connect(inf, peer, NAME_PROVIDER, sizeof(NAME_PROVIDER));
+	ck_assert_int_ge(rc, 0);
+
+}
+
+static void run_invoker()
+{
+	int rc;
+	int i;
+	pthread_t thread_poll, thread_list[THREAD_COUNT];
+	void *thread_rc;
+	struct lrpc_interface invoker[INVOKER_COUNT];
+	struct lrpc_endpoint peer[INVOKER_COUNT];
+
+	for (i = 0; i < INVOKER_COUNT; i++) {
+		init_invoker(invoker + i, peer + i);
+	}
+	rc = pthread_create(&thread_poll, NULL, thread_poll_routine, invoker);
+	ck_assert_int_eq(rc, 0);
+
+	for (i = 0; i < THREAD_COUNT; ++i) {
+		if (i % 2) {
+			thread_list[i] = start_sync_invoker(peer + (i % INVOKER_COUNT));
+		} else {
+			thread_list[i] = start_async_invoker(peer + (i % INVOKER_COUNT));
+		}
+		ck_assert_ptr_ne(thread_list[i], NULL);
+	}
+
+	for (i = 0; i < THREAD_COUNT; ++i) {
+		rc = pthread_join(thread_list[i], &thread_rc);
+		ck_assert_int_eq(rc, 0);
+		ck_assert_ptr_eq(thread_rc, NULL);
+	}
+
+	rc = (int) lrpc_call(peer + 0, "exit", NULL, 0, NULL, 0);
+	ck_assert_int_ge(rc, 0);
+
+	pthread_cancel(thread_poll);
+	rc = pthread_join(thread_poll, NULL);
+	ck_assert_int_eq(rc, 0);
+}
+
 START_TEST(test_thread)
 	int rc;
 	int fds[2];
-	int i;
 	pid_t pid;
 	ssize_t size;
 	char buf;
-	pthread_t thread_poll, thread_list[THREAD_COUNT];
-	void *thread_rc;
-	struct lrpc_interface inf;
-	struct lrpc_endpoint peer;
 
 	errno = 0;
 
@@ -206,38 +279,7 @@ START_TEST(test_thread)
 	size = read(fds[0], &buf, sizeof(buf));
 	ck_assert_int_eq(size, 1);
 
-	lrpc_init(&inf, NAME_INVOKER, sizeof(NAME_INVOKER));
-
-	rc = lrpc_start(&inf);
-	ck_assert_int_eq(rc, 0);
-
-	rc = lrpc_connect(&inf, &peer, NAME_PROVIDER, sizeof(NAME_PROVIDER));
-	ck_assert_int_ge(rc, 0);
-
-	rc = pthread_create(&thread_poll, NULL, thread_poll_routine, &inf);
-	ck_assert_int_eq(rc, 0);
-
-	for (i = 0; i < THREAD_COUNT; ++i) {
-		if (i % 2) {
-			thread_list[i] = start_sync_invoker(&peer);
-		} else {
-			thread_list[i] = start_async_invoker(&peer);
-		}
-		ck_assert_ptr_ne(thread_list[i], NULL);
-	}
-
-	for (i = 0; i < THREAD_COUNT; ++i) {
-		rc = pthread_join(thread_list[i], &thread_rc);
-		ck_assert_int_eq(rc, 0);
-		ck_assert_ptr_eq(thread_rc, NULL);
-	}
-
-	rc = (int) lrpc_call(&peer, "exit", NULL, 0, NULL, 0);
-	ck_assert_int_ge(rc, 0);
-
-	pthread_cancel(thread_poll);
-	rc = pthread_join(thread_poll, NULL);
-	ck_assert_int_eq(rc, 0);
+	run_invoker();
 
 	rc = waitpid(pid, NULL, 0);
 	ck_assert_int_eq(rc, pid);
@@ -251,7 +293,7 @@ TCase *create_tcase_thread()
 
 	/* Core test case */
 	tc = tcase_create("Multi-thread");
-	//tcase_set_timeout(tc, 0.1);
+	tcase_set_timeout(tc, 5);
 
 	tcase_add_test(tc, test_thread);
 	return tc;
