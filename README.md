@@ -2,6 +2,10 @@
 
 lrpc is a lightweight rpc library. The rpcs are send between process to process, and do not need a third process.
 
+# Dependency
+- uthash  (dev dependency)
+- check (dev dependency)
+
 # Build
 ```bash
 mkdir build

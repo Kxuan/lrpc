@@ -1,6 +1,6 @@
 language: c
 
 install:
-  - sudo apt-get install -qq check
+  - sudo apt-get install -qq check uthash-dev
 
 script: cmake -DCMAKE_BUILD_TYPE=Release . && make && make test
