@@ -15,10 +15,11 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 #include <sys/socket.h>
 #include <errno.h>
-#include <libut.h>
 #include <pthread.h>
+#include <utlist.h>
 #include "lrpc-internal.h"
 #include "msg.h"
 #include "socket.h"
