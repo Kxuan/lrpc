@@ -66,6 +66,7 @@ static void provider(int sigfd)
 	struct lrpc_interface inf;
 	struct lrpc_method method;
 	struct lrpc_packet pkt_buffer;
+	ssize_t size;
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 	lrpc_method_init(&method, TEST_METHOD, sync_rpc_echo, NULL);
@@ -76,7 +77,9 @@ static void provider(int sigfd)
 	rc = lrpc_start(&inf);
 	ck_assert_int_ge(rc, 0);
 
-	write(sigfd, "", 1);
+	size = write(sigfd, "", 1);
+	ck_assert_int_eq(size, 1);
+
 	rc = lrpc_poll(&inf, &pkt_buffer);
 	ck_assert_int_ge(rc, 0);
 
@@ -116,6 +119,7 @@ static void sync_invoker(int sigfd)
 static void async_provider(int sigfd)
 {
 	int rc;
+	ssize_t size;
 	struct lrpc_interface inf;
 	struct lrpc_method method;
 	struct lrpc_packet pkt_buffer;
@@ -130,7 +134,9 @@ static void async_provider(int sigfd)
 	rc = lrpc_start(&inf);
 	ck_assert_int_ge(rc, 0);
 
-	write(sigfd, "", 1);
+	size = write(sigfd, "", 1);
+	ck_assert_int_eq(size, 1);
+
 	rc = lrpc_poll(&inf, &pkt_buffer);
 	ck_assert_int_ge(rc, 0);
 

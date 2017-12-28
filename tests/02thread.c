@@ -54,6 +54,7 @@ static int sync_rpc_exit(void *user_data, const struct lrpc_callback_ctx *ctx, v
 static void provider(int sigfd)
 {
 	int rc;
+	ssize_t size;
 	struct lrpc_interface inf;
 	struct lrpc_method method_echo, method_exit;
 	struct lrpc_packet pkt_buffer;
@@ -72,7 +73,8 @@ static void provider(int sigfd)
 	rc = lrpc_start(&inf);
 	ck_assert_int_ge(rc, 0);
 
-	write(sigfd, "", 1);
+	size = write(sigfd, "", 1);
+	ck_assert_int_ge(size, 0);
 
 	while (running) {
 		rc = lrpc_poll(&inf, &pkt_buffer);
