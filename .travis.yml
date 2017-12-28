@@ -1,5 +1,7 @@
 language: c
 
+cache: ccache
+
 install:
   - sudo apt-get install -qq check uthash-dev
 
