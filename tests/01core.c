@@ -25,7 +25,7 @@
 #include "../src/socket.h"
 #include "test_common.h"
 
-void *thread_poll_routine(void *user_data)
+static void *thread_poll_routine(void *user_data)
 {
 	void *rc = NULL;
 	struct lrpc_interface *inf = user_data;
@@ -37,7 +37,7 @@ void *thread_poll_routine(void *user_data)
 	return rc;
 }
 
-int sync_rpc(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, size_t args_len)
+static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, size_t args_len)
 {
 	ck_assert_str_eq(args, TEST_CONTENT);
 	ck_assert_int_eq(args_len, sizeof(TEST_CONTENT));
@@ -47,7 +47,7 @@ int sync_rpc(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, s
 	return 0;
 }
 
-int async_rpc(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, size_t args_len)
+static int async_rpc(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, size_t args_len)
 {
 	struct lrpc_async_return_ctx *async_ctx = user_data;
 	int rc;
@@ -60,7 +60,7 @@ int async_rpc(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, 
 	return 0;
 }
 
-void sync_provider(int sigfd)
+static void provider(int sigfd)
 {
 	int rc;
 	struct lrpc_interface inf;
@@ -68,7 +68,7 @@ void sync_provider(int sigfd)
 	struct lrpc_packet pkt_buffer;
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
-	lrpc_method_init(&method, TEST_METHOD, sync_rpc, NULL);
+	lrpc_method_init(&method, TEST_METHOD, sync_rpc_echo, NULL);
 
 	rc = lrpc_method(&inf, &method);
 	ck_assert_int_ge(rc, 0);
@@ -82,7 +82,7 @@ void sync_provider(int sigfd)
 
 }
 
-void sync_invoker(int sigfd)
+static void sync_invoker(int sigfd)
 {
 	int rc;
 	char buf[sizeof(TEST_CONTENT)];
@@ -113,7 +113,7 @@ void sync_invoker(int sigfd)
 	ck_assert_str_eq(buf, TEST_CONTENT);
 }
 
-void async_provider(int sigfd)
+static void async_provider(int sigfd)
 {
 	int rc;
 	struct lrpc_interface inf;
@@ -138,7 +138,7 @@ void async_provider(int sigfd)
 	ck_assert_int_ge(rc, 0);
 }
 
-void async_call_callback(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
+static void async_call_callback(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
 	ck_assert_int_eq(err_code, 0);
 	ck_assert_int_eq(ret_size, sizeof(TEST_CONTENT));
@@ -146,7 +146,7 @@ void async_call_callback(struct lrpc_async_call_ctx *ctx, int err_code, void *re
 	ctx->user_data = (void *) 1;
 }
 
-void async_invoker(int sigfd)
+static void async_invoker(int sigfd)
 {
 	int rc;
 	char buf[sizeof(TEST_CONTENT)];
@@ -189,7 +189,7 @@ START_TEST(test_01sync)
 	ck_assert_int_ge(pid, 0);
 
 	if (pid == 0) {
-		sync_provider(fds[1]);
+		provider(fds[1]);
 		exit(0);
 	} else {
 		sync_invoker(fds[0]);
@@ -233,7 +233,29 @@ START_TEST(test_03async_call)
 	ck_assert_int_ge(pid, 0);
 
 	if (pid == 0) {
-		sync_provider(fds[1]);
+		provider(fds[1]);
+		exit(0);
+	} else {
+		async_invoker(fds[0]);
+		rc = waitpid(pid, NULL, 0);
+		ck_assert_int_eq(rc, pid);
+	}
+END_TEST
+
+START_TEST(test_04async_call_return)
+	int rc;
+	pid_t pid;
+	int fds[2];
+
+	rc = pipe(fds);
+
+	ck_assert_int_ge(rc, 0);
+
+	pid = fork();
+	ck_assert_int_ge(pid, 0);
+
+	if (pid == 0) {
+		async_provider(fds[1]);
 		exit(0);
 	} else {
 		async_invoker(fds[0]);
@@ -252,6 +274,7 @@ TCase *create_tcase_core()
 	tcase_add_test(tc, test_01sync);
 	tcase_add_test(tc, test_02async_return);
 	tcase_add_test(tc, test_03async_call);
+	tcase_add_test(tc, test_04async_call_return);
 
 	return tc;
 }

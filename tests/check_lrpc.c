@@ -22,6 +22,7 @@
 #include <wait.h>
 
 TCase *create_tcase_core();
+TCase *create_tcase_thread();
 
 int main(void)
 {
@@ -32,6 +33,7 @@ int main(void)
 	s = suite_create("lrpc");
 
 	suite_add_tcase(s, create_tcase_core());
+	suite_add_tcase(s, create_tcase_thread());
 
 	sr = srunner_create(s);
 	srunner_run_all(sr, CK_NORMAL);

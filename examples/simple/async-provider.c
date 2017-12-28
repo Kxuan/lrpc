@@ -26,9 +26,9 @@ struct rpc_context
 	size_t size;
 };
 
-int sync_rpc(void *user_data,
-             const struct lrpc_callback_ctx *ctx,
-             void *args, size_t args_len)
+int sync_rpc_echo(void *user_data,
+                  const struct lrpc_callback_ctx *ctx,
+                  void *args, size_t args_len)
 {
 	struct rpc_context *p = user_data;
 	size_t copy_size;
@@ -52,7 +52,7 @@ int main()
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 
-	lrpc_method_init(&method, "echo", sync_rpc, &ctx);
+	lrpc_method_init(&method, "echo", sync_rpc_echo, &ctx);
 	rc = lrpc_method(&inf, &method);
 	if (rc < 0) {
 		perror("lrpc_register_method");

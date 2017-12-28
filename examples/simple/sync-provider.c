@@ -19,9 +19,9 @@
 #include <stdio.h>
 #include "common.h"
 
-int sync_rpc(void *user_data,
-             const struct lrpc_callback_ctx *ctx,
-             void *args, size_t args_len)
+int sync_rpc_echo(void *user_data,
+                  const struct lrpc_callback_ctx *ctx,
+                  void *args, size_t args_len)
 {
 	lrpc_return(ctx, args, args_len);
 
@@ -37,7 +37,7 @@ int main()
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 
-	lrpc_method_init(&method, "echo", sync_rpc, NULL);
+	lrpc_method_init(&method, "echo", sync_rpc_echo, NULL);
 	rc = lrpc_method(&inf, &method);
 	if (rc < 0) {
 		perror("lrpc_register_method");
