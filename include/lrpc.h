@@ -119,8 +119,6 @@ int lrpc_connect(struct lrpc_interface *inf,
 
 void lrpc_method_init(struct lrpc_method *method, const char *name, lrpc_method_cb callback, void *user_data);
 
-struct lrpc_method *lrpc_method_create(const char *name, lrpc_method_cb callback, void *user_data);
-
 int lrpc_return_async(const struct lrpc_callback_ctx *ctx, struct lrpc_async_return_ctx *async_ctx);
 
 int lrpc_return_finish(struct lrpc_async_return_ctx *ctx, const void *ret, size_t ret_size);

@@ -16,7 +16,6 @@
 
 #include <utlist.h>
 #include <string.h>
-#include <malloc.h>
 #include <lrpc-internal.h>
 
 #include "method.h"
@@ -56,21 +55,6 @@ EXPORT void lrpc_method_init(struct lrpc_method *method, const char *name, lrpc_
 	method->name = name;
 	method->callback = callback;
 	method->user_data = user_data;
-}
-
-struct lrpc_method *lrpc_method_create(const char *name, lrpc_method_cb callback, void *user_data)
-{
-	struct lrpc_method *method = (struct lrpc_method *) malloc(sizeof(struct lrpc_method));
-	if (!method) {
-		return NULL;
-	}
-	lrpc_method_init(method, name, callback, user_data);
-	return method;
-}
-
-void lrpc_method_destroy(struct lrpc_method *method)
-{
-	free(method);
 }
 
 void method_table_init(struct method_table *table)
