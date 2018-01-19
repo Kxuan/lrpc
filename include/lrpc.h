@@ -101,4 +101,36 @@ struct lrpc_async_call_ctx
 
 #define LRPC_METHOD_NAME_MAX (32)
 
+ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
+                  const char *method_name, const void *args, size_t args_len,
+                  void *ret_ptr, size_t ret_size);
+
+int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *ctx, const char *method, const void *args,
+                    size_t args_len, lrpc_async_callback cb);
+
+void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len);
+
+int lrpc_start(struct lrpc_interface *inf);
+
+int lrpc_stop(struct lrpc_interface *inf);
+
+int lrpc_poll(struct lrpc_interface *inf, struct lrpc_packet *buffer);
+
+int lrpc_method(struct lrpc_interface *inf, struct lrpc_method *method);
+
+int lrpc_connect(struct lrpc_interface *inf,
+                 struct lrpc_endpoint *endpoint, const char *name, size_t name_len);
+
+void lrpc_method_init(struct lrpc_method *method, const char *name, lrpc_method_cb callback, void *user_data);
+
+struct lrpc_method *lrpc_method_create(const char *name, lrpc_method_cb callback, void *user_data);
+
+int lrpc_return_async(const struct lrpc_callback_ctx *ctx, struct lrpc_async_return_ctx *async_ctx);
+
+int lrpc_return_finish(struct lrpc_async_return_ctx *ctx, const void *ret, size_t ret_size);
+
+int lrpc_return(const struct lrpc_callback_ctx *ctx, const void *ret, size_t ret_size);
+
+int lrpc_msg_feed(struct lrpc_interface *inf, struct lrpc_packet *msg);
+
 #endif //LRPC_LRPC_H

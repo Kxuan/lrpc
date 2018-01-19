@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <pthread.h>
+#include <lrpc-internal.h>
 #include "config.h"
 #include "interface.h"
 
@@ -66,7 +67,7 @@ static void sync_call_finish(struct lrpc_async_call_ctx *ctx, int err_code, void
 	pthread_mutex_unlock(&sync_ctx->lock);
 }
 
-ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
+EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
                   const char *method_name, const void *args, size_t args_len,
                   void *ret_ptr, size_t ret_size)
 {
@@ -107,7 +108,7 @@ ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
 	return size;
 }
 
-int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *ctx, const char *method, const void *args,
+EXPORT int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *ctx, const char *method, const void *args,
                     size_t args_len, lrpc_async_callback cb)
 {
 	int rc;

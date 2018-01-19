@@ -17,6 +17,7 @@
 #include <utlist.h>
 #include <string.h>
 #include <malloc.h>
+#include <lrpc-internal.h>
 
 #include "method.h"
 
@@ -50,7 +51,7 @@ void method_deregister(struct method_table *table, struct lrpc_method *method)
 	DL_DELETE(table->all_methods, method);
 }
 
-void lrpc_method_init(struct lrpc_method *method, const char *name, lrpc_method_cb callback, void *user_data)
+EXPORT void lrpc_method_init(struct lrpc_method *method, const char *name, lrpc_method_cb callback, void *user_data)
 {
 	method->name = name;
 	method->callback = callback;

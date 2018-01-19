@@ -20,4 +20,6 @@
 #include <stdint.h>
 
 #define container_of(ptr, type, member) ((type *)((uintptr_t)(ptr) - offsetof(type, member)))
+
+#define EXPORT __attribute__((visibility("default")))
 #endif //LRPC_LRPC_INTERNAL_H

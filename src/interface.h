@@ -20,19 +20,6 @@
 #include "socket.h"
 #include "method.h"
 
-void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len);
-
-int lrpc_start(struct lrpc_interface *inf);
-
-int lrpc_stop(struct lrpc_interface *inf);
-
-int lrpc_poll(struct lrpc_interface *inf, struct lrpc_packet *buffer);
-
-int lrpc_method(struct lrpc_interface *inf, struct lrpc_method *method);
-
-int lrpc_connect(struct lrpc_interface *inf,
-                 struct lrpc_endpoint *endpoint, const char *name, size_t name_len);
-
 int inf_async_call(struct lrpc_interface *inf, struct lrpc_async_call_ctx *ctx, struct msghdr *msg);
 
 #endif //LRPC_INTERFACE_H

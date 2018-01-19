@@ -19,6 +19,7 @@
 #include <lrpc.h>
 #include <stdio.h>
 #include <pthread.h>
+#include <lrpc-internal.h>
 #include "interface.h"
 #include "socket.h"
 #include "msg.h"
@@ -41,19 +42,19 @@ err:
 	return -1;
 }
 
-int lrpc_connect(struct lrpc_interface *inf,
+EXPORT int lrpc_connect(struct lrpc_interface *inf,
                  struct lrpc_endpoint *endpoint, const char *name, size_t name_len)
 {
 	endpoint_init(endpoint, &inf->sock, name, name_len);
 	return 0;
 }
 
-int lrpc_method(struct lrpc_interface *inf, struct lrpc_method *method)
+EXPORT int lrpc_method(struct lrpc_interface *inf, struct lrpc_method *method)
 {
 	return method_register(&inf->all_methods, method);
 }
 
-void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len)
+EXPORT void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len)
 {
 	pthread_mutex_init(&inf->lock_call_list, NULL);
 	inf->call_list = NULL;
@@ -61,17 +62,17 @@ void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len)
 	method_table_init(&inf->all_methods);
 }
 
-int lrpc_start(struct lrpc_interface *inf)
+EXPORT int lrpc_start(struct lrpc_interface *inf)
 {
 	return lrpc_socket_open(&inf->sock);
 }
 
-int lrpc_stop(struct lrpc_interface *inf)
+EXPORT int lrpc_stop(struct lrpc_interface *inf)
 {
 	lrpc_socket_close(&inf->sock);
 }
 
-int lrpc_poll(struct lrpc_interface *inf, struct lrpc_packet *msg)
+EXPORT int lrpc_poll(struct lrpc_interface *inf, struct lrpc_packet *msg)
 {
 	int rc;
 	rc = socket_recvmsg(&inf->sock, msg, 0);

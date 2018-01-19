@@ -27,8 +27,4 @@ int method_register(struct method_table *table, struct lrpc_method *method);
 
 void method_deregister(struct method_table *table, struct lrpc_method *method);
 
-void lrpc_method_init(struct lrpc_method *method, const char *name, lrpc_method_cb callback, void *user_data);
-
-struct lrpc_method *lrpc_method_create(const char *name, lrpc_method_cb callback, void *user_data);
-
 #endif //LRPC_METHOD_H

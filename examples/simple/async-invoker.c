@@ -14,7 +14,7 @@
    <http://www.gnu.org/licenses/>.  */
 #include <stdlib.h>
 #include <string.h>
-#include <interface.h>
+#include <lrpc.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <assert.h>

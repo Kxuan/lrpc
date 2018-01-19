@@ -23,4 +23,5 @@ add_library(lrpc SHARED
         )
 
 target_link_libraries(lrpc PUBLIC pthread)
+target_compile_options(lrpc PUBLIC -fvisibility=hidden)
 install(TARGETS lrpc DESTINATION lib)

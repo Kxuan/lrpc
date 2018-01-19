@@ -76,12 +76,4 @@ int msg_build_call(struct lrpc_endpoint *endpoint,
                    const char *method_name,
                    const void *args, size_t args_len);
 
-int lrpc_return_async(const struct lrpc_callback_ctx *ctx, struct lrpc_async_return_ctx *async_ctx);
-
-int lrpc_return_finish(struct lrpc_async_return_ctx *ctx, const void *ret, size_t ret_size);
-
-int lrpc_return(const struct lrpc_callback_ctx *ctx, const void *ret, size_t ret_size);
-
-int lrpc_msg_feed(struct lrpc_interface *inf, struct lrpc_packet *msg);
-
 #endif //LRPC_MSG_H

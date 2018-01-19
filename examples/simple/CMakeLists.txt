@@ -14,7 +14,7 @@
 # <http://www.gnu.org/licenses/>.
 
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
-include_directories(../../src)
+include_directories(../../include)
 add_executable(simple-sync-provider sync-provider.c)
 add_executable(simple-sync-invoker sync-invoker.c)
 add_executable(simple-async-provider async-provider.c)

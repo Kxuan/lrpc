@@ -111,7 +111,7 @@ static int lrpc_return_error(struct lrpc_socket *sock, struct lrpc_packet *pkt, 
 
 }
 
-int lrpc_return_async(const struct lrpc_callback_ctx *user_ctx, struct lrpc_async_return_ctx *async_ctx)
+EXPORT int lrpc_return_async(const struct lrpc_callback_ctx *user_ctx, struct lrpc_async_return_ctx *async_ctx)
 {
 	struct lrpc_callback_ctx *ctx;
 	struct lrpc_packet *pkt;
@@ -135,7 +135,7 @@ int lrpc_return_async(const struct lrpc_callback_ctx *user_ctx, struct lrpc_asyn
 	return 0;
 }
 
-int lrpc_return_finish(struct lrpc_async_return_ctx *ctx, const void *ret, size_t ret_size)
+EXPORT int lrpc_return_finish(struct lrpc_async_return_ctx *ctx, const void *ret, size_t ret_size)
 {
 	return lrpc_do_return(&ctx->inf->sock,
 	                      &ctx->addr, ctx->addr_len,
@@ -144,7 +144,7 @@ int lrpc_return_finish(struct lrpc_async_return_ctx *ctx, const void *ret, size_
 	                      ret, ret_size);
 }
 
-int lrpc_return(const struct lrpc_callback_ctx *user_ctx, const void *ret, size_t ret_size)
+EXPORT int lrpc_return(const struct lrpc_callback_ctx *user_ctx, const void *ret, size_t ret_size)
 {
 	int rc;
 	struct lrpc_callback_ctx *ctx;

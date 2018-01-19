@@ -15,7 +15,7 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <interface.h>
+#include <lrpc.h>
 #include <stdio.h>
 #include "common.h"
 
