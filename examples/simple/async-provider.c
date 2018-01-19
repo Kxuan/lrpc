@@ -21,7 +21,7 @@
 
 struct rpc_context
 {
-	struct lrpc_async_return_ctx return_ctx;
+	struct lrpc_return_ctx return_ctx;
 	char buf[10];
 	size_t size;
 };

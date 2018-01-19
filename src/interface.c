@@ -26,7 +26,7 @@
 #include "msg.h"
 #include "endpoint.h"
 
-int inf_async_call(struct lrpc_interface *inf, struct lrpc_async_call_ctx *ctx, struct msghdr *msg)
+int inf_async_call(struct lrpc_interface *inf, struct lrpc_call_ctx *ctx, struct msghdr *msg)
 {
 	ssize_t size;
 	pthread_mutex_lock(&inf->lock_call_list);

@@ -51,7 +51,7 @@ struct sync_call_context
 	int err_code;
 };
 
-static void sync_call_finish(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
+static void sync_call_finish(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
 	struct sync_call_context *sync_ctx = ctx->user_data;
 	size_t copy_size;
@@ -74,7 +74,7 @@ EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
 {
 	int rc = 0;
 	ssize_t size;
-	struct lrpc_async_call_ctx ctx;
+	struct lrpc_call_ctx ctx;
 	struct sync_call_context sync_ctx;
 
 	pthread_mutex_init(&sync_ctx.lock, NULL);
@@ -110,7 +110,7 @@ EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
 }
 
 EXPORT int
-lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *ctx, const char *method, const void *args,
+lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const char *method, const void *args,
                 size_t args_len, lrpc_async_callback cb)
 {
 	int rc;

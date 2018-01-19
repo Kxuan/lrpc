@@ -26,15 +26,6 @@
 
 typedef uintptr_t lrpc_cookie_t;
 
-struct lrpc_endpoint
-{
-	struct lrpc_interface *inf;
-	socklen_t addr_len;
-	struct sockaddr_un addr;
-};
-
-struct lrpc_interface;
-
 struct lrpc_packet
 {
 	struct sockaddr_un addr;
@@ -62,7 +53,29 @@ struct method_table
 	struct lrpc_method *all_methods;
 };
 
-struct lrpc_async_call_ctx;
+struct lrpc_call_ctx;
+typedef void (*lrpc_async_callback)(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size);
+
+struct lrpc_call_ctx
+{
+	void *user_data;
+
+	lrpc_async_callback cb;
+
+	/* Private field */
+	lrpc_cookie_t cookie;
+	struct lrpc_call_ctx *prev, *next;
+};
+
+struct lrpc_interface;
+
+struct lrpc_endpoint
+{
+	struct lrpc_interface *inf;
+	socklen_t addr_len;
+	struct sockaddr_un addr;
+};
+
 struct lrpc_interface
 {
 	int fd;
@@ -73,10 +86,10 @@ struct lrpc_interface
 	struct lrpc_packet packet_recv;
 
 	pthread_mutex_t lock_call_list;
-	struct lrpc_async_call_ctx *call_list;
+	struct lrpc_call_ctx *call_list;
 };
 
-struct lrpc_async_return_ctx
+struct lrpc_return_ctx
 {
 	struct lrpc_interface *inf;
 	struct sockaddr_un addr;
@@ -84,24 +97,11 @@ struct lrpc_async_return_ctx
 	lrpc_cookie_t cookie;
 };
 
-typedef void (*lrpc_async_callback)(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size);
-
-struct lrpc_async_call_ctx
-{
-	void *user_data;
-
-	lrpc_async_callback cb;
-
-	/* Private field */
-	lrpc_cookie_t cookie;
-	struct lrpc_async_call_ctx *prev, *next;
-};
-
 ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
                   const char *method_name, const void *args, size_t args_len,
                   void *ret_ptr, size_t ret_size);
 
-int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *ctx, const char *method, const void *args,
+int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const char *method, const void *args,
                     size_t args_len, lrpc_async_callback cb);
 
 void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len);
@@ -119,9 +119,9 @@ int lrpc_connect(struct lrpc_interface *inf,
 
 void lrpc_method_init(struct lrpc_method *method, const char *name, lrpc_method_cb callback, void *user_data);
 
-int lrpc_return_async(const struct lrpc_callback_ctx *ctx, struct lrpc_async_return_ctx *async_ctx);
+int lrpc_return_async(const struct lrpc_callback_ctx *ctx, struct lrpc_return_ctx *async_ctx);
 
-int lrpc_return_finish(struct lrpc_async_return_ctx *ctx, const void *ret, size_t ret_size);
+int lrpc_return_finish(struct lrpc_return_ctx *ctx, const void *ret, size_t ret_size);
 
 int lrpc_return(const struct lrpc_callback_ctx *ctx, const void *ret, size_t ret_size);
 

@@ -76,7 +76,7 @@ static int lrpc_do_return(struct lrpc_interface *inf,
 
 	r.head.cookie = cookie;
 	r.head.type = types;
-	r.head.body_size = body_len;
+	r.head.body_size = (uint16_t) body_len;
 	r.returns_len = r.head.body_size;
 
 	iov[0].iov_base = &r;
@@ -111,7 +111,7 @@ static int lrpc_return_error(struct lrpc_interface *inf, struct lrpc_packet *pkt
 
 }
 
-EXPORT int lrpc_return_async(const struct lrpc_callback_ctx *user_ctx, struct lrpc_async_return_ctx *async_ctx)
+EXPORT int lrpc_return_async(const struct lrpc_callback_ctx *user_ctx, struct lrpc_return_ctx *async_ctx)
 {
 	struct lrpc_callback_ctx *ctx;
 	struct lrpc_packet *pkt;
@@ -135,7 +135,7 @@ EXPORT int lrpc_return_async(const struct lrpc_callback_ctx *user_ctx, struct lr
 	return 0;
 }
 
-EXPORT int lrpc_return_finish(struct lrpc_async_return_ctx *ctx, const void *ret, size_t ret_size)
+EXPORT int lrpc_return_finish(struct lrpc_return_ctx *ctx, const void *ret, size_t ret_size)
 {
 	return lrpc_do_return(ctx->inf,
 	                      &ctx->addr, ctx->addr_len,
@@ -226,7 +226,7 @@ static int feed_msg_return(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 		return -1;
 	}
 
-	struct lrpc_async_call_ctx *ctx;
+	struct lrpc_call_ctx *ctx;
 	pthread_mutex_lock(&inf->lock_call_list);
 	DL_FOREACH(inf->call_list, ctx) {
 		if (ctx->cookie == returns->head.cookie) {

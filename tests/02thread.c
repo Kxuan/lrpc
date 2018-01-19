@@ -133,7 +133,7 @@ static void *sync_invoker_routine(void *user_data)
 
 }
 
-static void async_echo_callback(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
+static void async_echo_callback(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
 	ck_assert_int_eq(err_code, 0);
 	ck_assert_str_eq(ret_ptr, TEST_CONTENT);
@@ -149,7 +149,7 @@ static void *async_invoker_routine(void *user_data)
 {
 	int rc;
 	char buf[sizeof(TEST_CONTENT)];
-	struct lrpc_async_call_ctx ctx;
+	struct lrpc_call_ctx ctx;
 	struct lrpc_endpoint *peer = user_data;
 	sem_t signal;
 
@@ -167,7 +167,7 @@ static void *async_invoker_routine(void *user_data)
 	sem_destroy(&signal);
 }
 
-static void async_exit_callback(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
+static void async_exit_callback(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
 	ck_assert_ptr_ne(ctx, NULL);
 	ck_assert_int_eq(err_code, 0);

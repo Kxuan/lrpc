@@ -20,7 +20,7 @@
 #include <assert.h>
 #include "common.h"
 
-void callback(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
+void callback(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
 	if (strncmp(ret_ptr, "hello", ret_size) != 0) {
 		fprintf(stderr, "result mismatched!\n");
@@ -34,7 +34,7 @@ int main()
 	int rc;
 	struct lrpc_interface inf;
 	struct lrpc_endpoint provider;
-	struct lrpc_async_call_ctx call_ctx;
+	struct lrpc_call_ctx call_ctx;
 	pthread_t thd;
 
 	lrpc_init(&inf, NAME_INVOKER, sizeof(NAME_INVOKER));

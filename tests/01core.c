@@ -46,7 +46,7 @@ static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx, v
 
 static int async_rpc(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, size_t args_len)
 {
-	struct lrpc_async_return_ctx *async_ctx = user_data;
+	struct lrpc_return_ctx *async_ctx = user_data;
 	int rc;
 	ck_assert_ptr_ne(user_data, NULL);
 	ck_assert_str_eq(args, TEST_CONTENT);
@@ -118,7 +118,7 @@ static void async_provider(int sigfd)
 	ssize_t size;
 	struct lrpc_interface inf;
 	struct lrpc_method method;
-	struct lrpc_async_return_ctx ctx = {0};
+	struct lrpc_return_ctx ctx = {0};
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 	lrpc_method_init(&method, TEST_METHOD, async_rpc, &ctx);
@@ -139,7 +139,7 @@ static void async_provider(int sigfd)
 	ck_assert_int_ge(rc, 0);
 }
 
-static void async_call_callback(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
+static void async_call_callback(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
 	ck_assert_int_eq(err_code, 0);
 	ck_assert_int_eq(ret_size, sizeof(TEST_CONTENT));
@@ -165,7 +165,7 @@ static void async_invoker(int sigfd)
 	rc = lrpc_connect(&inf, &peer, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 	ck_assert_int_ge(rc, 0);
 
-	struct lrpc_async_call_ctx ctx;
+	struct lrpc_call_ctx ctx;
 	rc = lrpc_call_async(&peer, &ctx, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), async_call_callback);
 	ck_assert_int_ge(rc, 0);
 
