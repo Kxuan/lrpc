@@ -59,7 +59,7 @@ EXPORT int lrpc_method(struct lrpc_interface *inf, struct lrpc_method *method)
 EXPORT void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len)
 {
 	pthread_mutex_init(&inf->lock_call_list, NULL);
-	pthread_mutex_init(&inf->lock_recv, NULL);
+	pthread_mutex_init(&inf->lock_poll, NULL);
 
 	inf->call_list = NULL;
 	inf->fd = -1;
@@ -99,7 +99,7 @@ EXPORT int lrpc_stop(struct lrpc_interface *inf)
 	}
 }
 
-int lrpc_poll_unsafe(struct lrpc_interface *inf, struct lrpc_packet *pkt, size_t payload_size)
+int inf_poll_unsafe(struct lrpc_interface *inf, struct lrpc_packet *pkt, size_t payload_size)
 {
 	int rc;
 	ssize_t size;
@@ -131,15 +131,15 @@ EXPORT int lrpc_poll(struct lrpc_interface *inf)
 {
 	int rc;
 
-	rc = pthread_mutex_trylock(&inf->lock_recv);
+	rc = pthread_mutex_trylock(&inf->lock_poll);
 	if (rc != 0) {
 		errno = rc;
 		return -1;
 	}
 
-	rc = lrpc_poll_unsafe(inf, &inf->packet_recv, sizeof(inf->packet_recv.payload));
+	rc = inf_poll_unsafe(inf, &inf->packet_recv, sizeof(inf->packet_recv.payload));
 
-	pthread_mutex_unlock(&inf->lock_recv);
+	pthread_mutex_unlock(&inf->lock_poll);
 
 	return rc;
 }

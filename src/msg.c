@@ -251,7 +251,13 @@ static int feed_msg_return(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 	return 0;
 
 }
-
+/**
+ * feed message to the interface
+ *
+ * @param inf the interface
+ * @param msg message to feed
+ * @return 0 on success, -1 on failure
+ */
 int lrpc_msg_feed(struct lrpc_interface *inf, struct lrpc_packet *msg)
 {
 	struct lrpc_msg_head *head;

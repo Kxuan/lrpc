@@ -85,7 +85,7 @@ struct lrpc_interface
 	pthread_mutex_t lock_call_list;
 	struct lrpc_call_ctx *call_list;
 
-	pthread_mutex_t lock_recv;
+	pthread_mutex_t lock_poll;
 	struct lrpc_packet packet_recv;
 };
 
