@@ -20,7 +20,7 @@
 #include <sys/un.h>
 #include <stdint.h>
 
-#define LRPC_MAX_PACKET_SIZE (512)
+#define LRPC_MAX_PACKET_SIZE (4096)
 #define LRPC_METHOD_NAME_MAX (32)
 
 
