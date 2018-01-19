@@ -82,11 +82,11 @@ struct lrpc_interface
 	struct lrpc_endpoint local_endpoint;
 	struct method_table all_methods;
 
-	pthread_mutex_t lock_recv;
-	struct lrpc_packet packet_recv;
-
 	pthread_mutex_t lock_call_list;
 	struct lrpc_call_ctx *call_list;
+
+	pthread_mutex_t lock_recv;
+	struct lrpc_packet packet_recv;
 };
 
 struct lrpc_return_ctx
