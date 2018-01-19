@@ -17,14 +17,12 @@
 #include <wait.h>
 #include <stdlib.h>
 #include <check.h>
-#include <lrpc.h>
 #include <stdio.h>
 #include <errno.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <sys/epoll.h>
-#include "../src/msg.h"
-#include "../src/socket.h"
+#include <lrpc.h>
 #include "test_common.h"
 
 #define THREAD_COUNT 100
@@ -103,7 +101,7 @@ static void *thread_poll_routine(void *user_data)
 		evt[i].events = EPOLLIN;
 		evt[i].data.ptr = all_inf + i;
 
-		rc = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, all_inf[i].sock.fd, evt + i);
+		rc = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, all_inf[i].fd, evt + i);
 		ck_assert_int_eq(rc, 0);
 	}
 

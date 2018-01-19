@@ -22,14 +22,15 @@
 #include <lrpc-internal.h>
 #include "config.h"
 #include "interface.h"
+#include "msg.h"
 
-void endpoint_init(struct lrpc_endpoint *endpoint, struct lrpc_socket *sock, const char *name, size_t name_len)
+void endpoint_init(struct lrpc_endpoint *endpoint, struct lrpc_interface *inf, const char *name, size_t name_len)
 {
 	char *p;
 
 	assert(endpoint && name_len && name);
 
-	endpoint->sock = sock;
+	endpoint->inf = inf;
 	endpoint->addr.sun_family = AF_UNIX;
 	p = endpoint->addr.sun_path;
 	*p++ = 0;
@@ -68,8 +69,8 @@ static void sync_call_finish(struct lrpc_async_call_ctx *ctx, int err_code, void
 }
 
 EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
-                  const char *method_name, const void *args, size_t args_len,
-                  void *ret_ptr, size_t ret_size)
+                         const char *method_name, const void *args, size_t args_len,
+                         void *ret_ptr, size_t ret_size)
 {
 	int rc = 0;
 	ssize_t size;
@@ -108,8 +109,9 @@ EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
 	return size;
 }
 
-EXPORT int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *ctx, const char *method, const void *args,
-                    size_t args_len, lrpc_async_callback cb)
+EXPORT int
+lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_call_ctx *ctx, const char *method, const void *args,
+                size_t args_len, lrpc_async_callback cb)
 {
 	int rc;
 	struct lrpc_interface *inf;
@@ -130,7 +132,7 @@ EXPORT int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_async_cal
 	}
 	ctx->cookie = (lrpc_cookie_t) &call;
 
-	inf = endpoint->sock->inf;
+	inf = endpoint->inf;
 
 	rc = inf_async_call(inf, ctx, &msg);
 	if (rc < 0) {

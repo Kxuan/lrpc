@@ -21,6 +21,6 @@
 
 #include <lrpc.h>
 
-void endpoint_init(struct lrpc_endpoint *endpoint, struct lrpc_socket *sock, const char *name, size_t name_len);
+void endpoint_init(struct lrpc_endpoint *endpoint, struct lrpc_interface *inf, const char *name, size_t name_len);
 
 #endif //LRPC_ENDPOINT_H

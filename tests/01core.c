@@ -17,12 +17,10 @@
 #include <wait.h>
 #include <stdlib.h>
 #include <check.h>
-#include <lrpc.h>
 #include <stdio.h>
 #include <errno.h>
 #include <pthread.h>
-#include "../src/msg.h"
-#include "../src/socket.h"
+#include <lrpc.h>
 #include "test_common.h"
 
 static void *thread_poll_routine(void *user_data)

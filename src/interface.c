@@ -20,9 +20,10 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <lrpc-internal.h>
+#include <unistd.h>
 #include "interface.h"
-#include "socket.h"
 #include "msg.h"
+#include "endpoint.h"
 
 int inf_async_call(struct lrpc_interface *inf, struct lrpc_async_call_ctx *ctx, struct msghdr *msg)
 {
@@ -30,7 +31,7 @@ int inf_async_call(struct lrpc_interface *inf, struct lrpc_async_call_ctx *ctx, 
 	pthread_mutex_lock(&inf->lock_call_list);
 	DL_APPEND(inf->call_list, ctx);
 	pthread_mutex_unlock(&inf->lock_call_list);
-	size = socket_sendmsg(&inf->sock, msg, 0);
+	size = sendmsg(inf->fd, msg, 0);
 	if (size <= 0) {
 		goto err;
 	}
@@ -43,9 +44,9 @@ err:
 }
 
 EXPORT int lrpc_connect(struct lrpc_interface *inf,
-                 struct lrpc_endpoint *endpoint, const char *name, size_t name_len)
+                        struct lrpc_endpoint *endpoint, const char *name, size_t name_len)
 {
-	endpoint_init(endpoint, &inf->sock, name, name_len);
+	endpoint_init(endpoint, inf, name, name_len);
 	return 0;
 }
 
@@ -58,28 +59,67 @@ EXPORT void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len)
 {
 	pthread_mutex_init(&inf->lock_call_list, NULL);
 	inf->call_list = NULL;
-	lrpc_socket_init(&inf->sock, inf, name, name_len);
+	inf->fd = -1;
+	endpoint_init(&inf->local_endpoint, inf, name, name_len);
 	method_table_init(&inf->all_methods);
 }
 
 EXPORT int lrpc_start(struct lrpc_interface *inf)
 {
-	return lrpc_socket_open(&inf->sock);
+	int fd;
+	int rc;
+
+	assert(inf->fd < 0);
+
+	fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if (fd < 0) {
+		goto err;
+	}
+
+	rc = bind(fd, (struct sockaddr *) &inf->local_endpoint.addr, inf->local_endpoint.addr_len);
+	if (rc < 0) {
+		goto err_bind;
+	}
+	inf->fd = fd;
+	return 0;
+err_bind:
+	close(fd);
+err:
+	return -1;
 }
 
 EXPORT int lrpc_stop(struct lrpc_interface *inf)
 {
-	lrpc_socket_close(&inf->sock);
+	if (inf->fd >= 0) {
+		close(inf->fd);
+		inf->fd = -1;
+	}
 }
 
-EXPORT int lrpc_poll(struct lrpc_interface *inf, struct lrpc_packet *msg)
+EXPORT int lrpc_poll(struct lrpc_interface *inf, struct lrpc_packet *m)
 {
 	int rc;
-	rc = socket_recvmsg(&inf->sock, msg, 0);
-	if (rc < 0) {
-		return -1;
-	}
+	ssize_t size;
 
-	rc = lrpc_msg_feed(inf, msg);
+	m->iov.iov_base = m->payload;
+	m->iov.iov_len = LRPC_MAX_PACKET_SIZE;
+
+	m->msgh.msg_name = &m->addr;
+	m->msgh.msg_namelen = sizeof(m->addr);
+	m->msgh.msg_controllen = 0;
+	m->msgh.msg_control = NULL;
+	m->msgh.msg_iov = &m->iov;
+	m->msgh.msg_iovlen = 1;
+
+	size = recvmsg(inf->fd, &m->msgh, 0);
+	if (size <= 0) {
+		goto err;
+	}
+	m->payload_len = (size_t) size;
+
+	rc = lrpc_msg_feed(inf, m);
 	return rc;
+
+err:
+	return -1;
 }

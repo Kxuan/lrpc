@@ -16,7 +16,6 @@
 add_library(lrpc SHARED
         method.c method.h
         interface.c interface.h
-        socket.c socket.h
         msg.c msg.h
         endpoint.c endpoint.h
         ../include/lrpc-internal.h ../include/lrpc.h

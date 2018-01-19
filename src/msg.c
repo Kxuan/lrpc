@@ -22,7 +22,7 @@
 #include <utlist.h>
 #include "lrpc-internal.h"
 #include "msg.h"
-#include "socket.h"
+#include "method.h"
 
 
 int msg_build_call(struct lrpc_endpoint *endpoint,
@@ -63,7 +63,7 @@ int msg_build_call(struct lrpc_endpoint *endpoint,
 	return 0;
 }
 
-static int lrpc_do_return(struct lrpc_socket *sock,
+static int lrpc_do_return(struct lrpc_interface *inf,
                           const struct sockaddr_un *addr, socklen_t addr_len,
                           lrpc_cookie_t cookie,
                           enum lrpc_msg_types types,
@@ -92,18 +92,18 @@ static int lrpc_do_return(struct lrpc_socket *sock,
 	msg.msg_iovlen = sizeof(iov) / sizeof(*iov);
 	msg.msg_flags = 0;
 
-	size = socket_sendmsg(sock, &msg, MSG_NOSIGNAL);
+	size = sendmsg(inf->fd, &msg, MSG_NOSIGNAL);
 	if (size < 0) {
 		return -1;
 	}
 	return 0;
 }
 
-static int lrpc_return_error(struct lrpc_socket *sock, struct lrpc_packet *pkt, int err)
+static int lrpc_return_error(struct lrpc_interface *inf, struct lrpc_packet *pkt, int err)
 {
 	struct lrpc_msg_call *call;
 	call = (struct lrpc_msg_call *) pkt->payload;
-	return lrpc_do_return(sock,
+	return lrpc_do_return(inf,
 	                      &pkt->addr, pkt->msgh.msg_namelen,
 	                      call->head.cookie,
 	                      LRPC_MSGTYP_RETURN_ERROR,
@@ -137,7 +137,7 @@ EXPORT int lrpc_return_async(const struct lrpc_callback_ctx *user_ctx, struct lr
 
 EXPORT int lrpc_return_finish(struct lrpc_async_return_ctx *ctx, const void *ret, size_t ret_size)
 {
-	return lrpc_do_return(&ctx->inf->sock,
+	return lrpc_do_return(ctx->inf,
 	                      &ctx->addr, ctx->addr_len,
 	                      ctx->cookie,
 	                      LRPC_MSGTYP_RETURN,
@@ -163,7 +163,7 @@ EXPORT int lrpc_return(const struct lrpc_callback_ctx *user_ctx, const void *ret
 		return -1;
 	}
 
-	rc = lrpc_do_return(&ctx->inf->sock,
+	rc = lrpc_do_return(ctx->inf,
 	                    &pkt->addr, pkt->msgh.msg_namelen,
 	                    call->head.cookie,
 	                    LRPC_MSGTYP_RETURN,
@@ -195,7 +195,7 @@ static int feed_msg_call(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 
 	method = method_find(&inf->all_methods, call->method, call->method_len);
 	if (method == NULL) {
-		lrpc_return_error(&inf->sock, pkt, EOPNOTSUPP);
+		lrpc_return_error(inf, pkt, EOPNOTSUPP);
 		errno = EINVAL;
 		return -1;
 	}

@@ -17,7 +17,6 @@
 #ifndef LRPC_INTERFACE_H
 #define LRPC_INTERFACE_H
 
-#include "socket.h"
 #include "method.h"
 
 int inf_async_call(struct lrpc_interface *inf, struct lrpc_async_call_ctx *ctx, struct msghdr *msg);

@@ -21,25 +21,19 @@
 #include <stdint.h>
 
 #define LRPC_MAX_PACKET_SIZE (512)
+#define LRPC_METHOD_NAME_MAX (32)
+
 
 typedef uintptr_t lrpc_cookie_t;
 
-struct lrpc_socket;
 struct lrpc_endpoint
 {
-	struct lrpc_socket *sock;
+	struct lrpc_interface *inf;
 	socklen_t addr_len;
 	struct sockaddr_un addr;
 };
 
 struct lrpc_interface;
-struct lrpc_socket
-{
-	struct lrpc_interface *inf;
-	int fd;
-	struct lrpc_endpoint endpoint;
-};
-
 
 struct lrpc_packet
 {
@@ -71,7 +65,8 @@ struct method_table
 struct lrpc_async_call_ctx;
 struct lrpc_interface
 {
-	struct lrpc_socket sock;
+	int fd;
+	struct lrpc_endpoint local_endpoint;
 	struct method_table all_methods;
 
 	pthread_mutex_t lock_call_list;
@@ -98,8 +93,6 @@ struct lrpc_async_call_ctx
 	lrpc_cookie_t cookie;
 	struct lrpc_async_call_ctx *prev, *next;
 };
-
-#define LRPC_METHOD_NAME_MAX (32)
 
 ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
                   const char *method_name, const void *args, size_t args_len,
