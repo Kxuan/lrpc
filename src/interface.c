@@ -21,6 +21,7 @@
 #include <pthread.h>
 #include <lrpc-internal.h>
 #include <unistd.h>
+#include <errno.h>
 #include "interface.h"
 #include "msg.h"
 #include "endpoint.h"
@@ -58,6 +59,8 @@ EXPORT int lrpc_method(struct lrpc_interface *inf, struct lrpc_method *method)
 EXPORT void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len)
 {
 	pthread_mutex_init(&inf->lock_call_list, NULL);
+	pthread_mutex_init(&inf->lock_recv, NULL);
+
 	inf->call_list = NULL;
 	inf->fd = -1;
 	endpoint_init(&inf->local_endpoint, inf, name, name_len);
@@ -96,30 +99,47 @@ EXPORT int lrpc_stop(struct lrpc_interface *inf)
 	}
 }
 
-EXPORT int lrpc_poll(struct lrpc_interface *inf, struct lrpc_packet *m)
+int lrpc_poll_unsafe(struct lrpc_interface *inf, struct lrpc_packet *pkt, size_t payload_size)
 {
 	int rc;
 	ssize_t size;
+	
+	pkt->iov.iov_base = pkt->payload;
+	pkt->iov.iov_len = payload_size;
 
-	m->iov.iov_base = m->payload;
-	m->iov.iov_len = LRPC_MAX_PACKET_SIZE;
+	pkt->msgh.msg_name = &pkt->addr;
+	pkt->msgh.msg_namelen = sizeof(pkt->addr);
+	pkt->msgh.msg_controllen = 0;
+	pkt->msgh.msg_control = NULL;
+	pkt->msgh.msg_iov = &pkt->iov;
+	pkt->msgh.msg_iovlen = 1;
 
-	m->msgh.msg_name = &m->addr;
-	m->msgh.msg_namelen = sizeof(m->addr);
-	m->msgh.msg_controllen = 0;
-	m->msgh.msg_control = NULL;
-	m->msgh.msg_iov = &m->iov;
-	m->msgh.msg_iovlen = 1;
-
-	size = recvmsg(inf->fd, &m->msgh, 0);
+	size = recvmsg(inf->fd, &pkt->msgh, 0);
 	if (size <= 0) {
 		goto err;
 	}
-	m->payload_len = (size_t) size;
+	pkt->payload_len = (size_t) size;
 
-	rc = lrpc_msg_feed(inf, m);
+	rc = lrpc_msg_feed(inf, pkt);
 	return rc;
 
 err:
 	return -1;
+}
+
+EXPORT int lrpc_poll(struct lrpc_interface *inf)
+{
+	int rc;
+
+	rc = pthread_mutex_trylock(&inf->lock_recv);
+	if (rc != 0) {
+		errno = rc;
+		return -1;
+	}
+
+	rc = lrpc_poll_unsafe(inf, &inf->packet_recv, sizeof(inf->packet_recv.payload));
+
+	pthread_mutex_unlock(&inf->lock_recv);
+
+	return rc;
 }

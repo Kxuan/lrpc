@@ -42,7 +42,6 @@ void *thread_invoke(void *data)
 int main()
 {
 	int rc;
-	struct lrpc_packet pkt_buf;
 	struct lrpc_interface inf;
 	struct lrpc_endpoint provider;
 	pthread_t thd;
@@ -58,7 +57,7 @@ int main()
 	rc = pthread_create(&thd, NULL, thread_invoke, &provider);
 	assert(rc >= 0);
 
-	rc = lrpc_poll(&inf, &pkt_buf);
+	rc = lrpc_poll(&inf);
 	assert(rc >= 0);
 
 	rc = pthread_join(thd, NULL);

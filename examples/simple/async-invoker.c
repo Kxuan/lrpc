@@ -32,7 +32,6 @@ void callback(struct lrpc_async_call_ctx *ctx, int err_code, void *ret_ptr, size
 int main()
 {
 	int rc;
-	struct lrpc_packet pkt_buf;
 	struct lrpc_interface inf;
 	struct lrpc_endpoint provider;
 	struct lrpc_async_call_ctx call_ctx;
@@ -49,7 +48,7 @@ int main()
 	rc = lrpc_call_async(&provider, &call_ctx, "echo", "hello", 6, callback);
 	assert(rc >= 0);
 
-	rc = lrpc_poll(&inf, &pkt_buf);
+	rc = lrpc_poll(&inf);
 	assert(rc >= 0);
 
 	lrpc_stop(&inf);

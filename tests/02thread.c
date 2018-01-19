@@ -55,7 +55,6 @@ static void provider(int sigfd)
 	ssize_t size;
 	struct lrpc_interface inf;
 	struct lrpc_method method_echo, method_exit;
-	struct lrpc_packet pkt_buffer;
 	int running = 1;
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
@@ -75,7 +74,7 @@ static void provider(int sigfd)
 	ck_assert_int_ge(size, 0);
 
 	while (running) {
-		rc = lrpc_poll(&inf, &pkt_buffer);
+		rc = lrpc_poll(&inf);
 		if (rc != 0) {
 			perror("lrpc_poll");
 		}
@@ -89,7 +88,6 @@ static void *thread_poll_routine(void *user_data)
 {
 	int rc;
 	struct lrpc_interface *all_inf = user_data, *inf;
-	struct lrpc_packet rcv_buf;
 	int epoll_fd;
 	int nevents;
 	int i;
@@ -109,7 +107,7 @@ static void *thread_poll_routine(void *user_data)
 		nevents = epoll_wait(epoll_fd, evt, sizeof(evt) / sizeof(*evt), -1);
 		for (i = 0; i < nevents; i++) {
 			inf = evt[i].data.ptr;
-			rc = lrpc_poll(inf, &rcv_buf);
+			rc = lrpc_poll(inf);
 			ck_assert_int_eq(rc, 0);
 		}
 	}

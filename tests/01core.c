@@ -27,9 +27,8 @@ static void *thread_poll_routine(void *user_data)
 {
 	void *rc = NULL;
 	struct lrpc_interface *inf = user_data;
-	struct lrpc_packet rcv_buf;
 
-	if (lrpc_poll(inf, &rcv_buf) < 0) {
+	if (lrpc_poll(inf) < 0) {
 		rc = (void *) (uintptr_t) errno;
 	}
 	return rc;
@@ -63,7 +62,6 @@ static void provider(int sigfd)
 	int rc;
 	struct lrpc_interface inf;
 	struct lrpc_method method;
-	struct lrpc_packet pkt_buffer;
 	ssize_t size;
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
@@ -78,7 +76,7 @@ static void provider(int sigfd)
 	size = write(sigfd, "", 1);
 	ck_assert_int_eq(size, 1);
 
-	rc = lrpc_poll(&inf, &pkt_buffer);
+	rc = lrpc_poll(&inf);
 	ck_assert_int_ge(rc, 0);
 
 }
@@ -120,7 +118,6 @@ static void async_provider(int sigfd)
 	ssize_t size;
 	struct lrpc_interface inf;
 	struct lrpc_method method;
-	struct lrpc_packet pkt_buffer;
 	struct lrpc_async_return_ctx ctx = {0};
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
@@ -135,7 +132,7 @@ static void async_provider(int sigfd)
 	size = write(sigfd, "", 1);
 	ck_assert_int_eq(size, 1);
 
-	rc = lrpc_poll(&inf, &pkt_buffer);
+	rc = lrpc_poll(&inf);
 	ck_assert_int_ge(rc, 0);
 
 	rc = lrpc_return_finish(&ctx, TEST_CONTENT, sizeof(TEST_CONTENT));
@@ -155,7 +152,6 @@ static void async_invoker(int sigfd)
 	int rc;
 	char buf[sizeof(TEST_CONTENT)];
 	struct lrpc_interface inf;
-	struct lrpc_packet pkt_buffer;
 	struct lrpc_endpoint peer;
 	ssize_t size;
 
@@ -173,7 +169,7 @@ static void async_invoker(int sigfd)
 	rc = lrpc_call_async(&peer, &ctx, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), async_call_callback);
 	ck_assert_int_ge(rc, 0);
 
-	rc = lrpc_poll(&inf, &pkt_buffer);
+	rc = lrpc_poll(&inf);
 	ck_assert_int_ge(rc, 0);
 
 	ck_assert_ptr_eq(ctx.user_data, (void *) 1);

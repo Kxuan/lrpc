@@ -33,7 +33,6 @@ int main()
 	int rc;
 	struct lrpc_interface inf;
 	struct lrpc_method method;
-	struct lrpc_packet pkt_buffer;
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 
@@ -50,7 +49,7 @@ int main()
 		abort();
 	}
 
-	rc = lrpc_poll(&inf, &pkt_buffer);
+	rc = lrpc_poll(&inf);
 	if (rc < 0) {
 		perror("lrpc_poll");
 		abort();
