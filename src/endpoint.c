@@ -75,6 +75,10 @@ endpoint_call_and_wait(struct lrpc_endpoint *endpoint,
 {
 	int rc, poll_rc = 0;
 	struct lrpc_interface *inf = endpoint->inf;
+	struct lrpc_packet *pkt = inf->alloc_packet(inf);
+	if (!pkt) {
+		return -1;
+	}
 
 	rc = pthread_mutex_trylock(&inf->lock_poll);
 	if (rc == 0) {
@@ -114,8 +118,7 @@ endpoint_call_and_wait(struct lrpc_endpoint *endpoint,
 		rc = lrpc_call_async(endpoint, async_ctx, method_name, args, args_len, sync_call_finish);
 		if (rc == 0) {
 			while (sync_ctx->done == 0 && poll_rc == 0) {
-				poll_rc = inf_poll_unsafe(endpoint->inf, &endpoint->inf->packet_recv,
-				                          sizeof(endpoint->inf->packet_recv.payload));
+				poll_rc = inf_poll_unsafe(endpoint->inf, pkt);
 			}
 			if (sync_ctx->done == 0) {
 				rc = poll_rc;
@@ -138,6 +141,8 @@ endpoint_call_and_wait(struct lrpc_endpoint *endpoint,
 		errno = rc;
 		rc = -1;
 	}
+
+	inf->free_packet(inf, pkt);
 	return rc;
 }
 

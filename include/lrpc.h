@@ -20,7 +20,7 @@
 #include <sys/un.h>
 #include <stdint.h>
 
-#define LRPC_MAX_PACKET_SIZE (4096)
+#define LRPC_DEFAULT_PACKET_SIZE (4096)
 #define LRPC_METHOD_NAME_MAX (32)
 
 
@@ -28,11 +28,12 @@ typedef uintptr_t lrpc_cookie_t;
 
 struct lrpc_packet
 {
+	struct lrpc_packet *prev, *next;
 	struct sockaddr_un addr;
 	struct msghdr msgh;
 	struct iovec iov;
-	size_t payload_len;
-	char payload[LRPC_MAX_PACKET_SIZE];
+	size_t payload_len, payload_size;
+	char payload[LRPC_DEFAULT_PACKET_SIZE];
 };
 
 struct lrpc_callback_ctx;
@@ -54,6 +55,7 @@ struct method_table
 };
 
 struct lrpc_call_ctx;
+
 typedef void (*lrpc_async_callback)(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size);
 
 struct lrpc_call_ctx
@@ -86,7 +88,10 @@ struct lrpc_interface
 	struct lrpc_call_ctx *call_list;
 
 	pthread_mutex_t lock_poll;
-	struct lrpc_packet packet_recv;
+
+	struct lrpc_packet *(*alloc_packet)(struct lrpc_interface *inf);
+
+	void (*free_packet)(struct lrpc_interface *inf, struct lrpc_packet *pkt);
 };
 
 struct lrpc_return_ctx
