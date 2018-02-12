@@ -53,6 +53,8 @@ struct lrpc_msg_call
 
 	uint16_t args_len;
 	uint8_t method_len;
+	// CLOCK_MONOTONIC timeout value
+	struct timespec timeout;
 	char method[LRPC_METHOD_NAME_MAX];
 };
 
