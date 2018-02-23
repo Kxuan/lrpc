@@ -1,4 +1,4 @@
-/* Copyright (C) 2017 kXuan <kxuanobj@gmail.com>
+/* Copyright (C) 2017-2018 kXuan <kxuanobj@gmail.com>
 
    This file is part of the lrpc.
    The lrpc is free software; you can redistribute it and/or
