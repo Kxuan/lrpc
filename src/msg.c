@@ -175,6 +175,18 @@ EXPORT int lrpc_return(const struct lrpc_callback_ctx *user_ctx, const void *ret
 	return rc;
 }
 
+EXPORT int lrpc_get_args(const struct lrpc_callback_ctx *ctx, void **pargs, size_t *args_len)
+{
+	struct lrpc_msg_call *call = (struct lrpc_msg_call *) ctx->pkt->payload;
+	if (pargs) {
+		*pargs = call->args;
+	}
+
+	if (args_len) {
+		*args_len = ctx->pkt->payload_len - offsetof(struct lrpc_msg_call, args);
+	}
+	return 0;
+}
 
 static int feed_msg_call(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 {
@@ -202,7 +214,7 @@ static int feed_msg_call(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 	ctx.inf = inf;
 	ctx.pkt = pkt;
 	ctx.ret_status = LRPC_RETST_CALLBACK;
-	cb_returns = method->callback(method->user_data, &ctx, call + 1, pkt->payload_len - sizeof(*call));
+	cb_returns = method->callback(method->user_data, &ctx);
 
 	if (ctx.ret_status == LRPC_RETST_CALLBACK) {
 		lrpc_return(&ctx, &cb_returns, sizeof(cb_returns));

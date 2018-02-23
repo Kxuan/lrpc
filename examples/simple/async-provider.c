@@ -26,12 +26,14 @@ struct rpc_context
 	size_t size;
 };
 
-int sync_rpc_echo(void *user_data,
-                  const struct lrpc_callback_ctx *ctx,
-                  void *args, size_t args_len)
+int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
 {
+	void *args;
+	size_t args_len;
 	struct rpc_context *p = user_data;
 	size_t copy_size;
+
+	lrpc_get_args(ctx, &args, &args_len);
 
 	copy_size = sizeof(p->buf) > args_len ? args_len : sizeof(p->buf);
 	memcpy(p->buf, args, copy_size);

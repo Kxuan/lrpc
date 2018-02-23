@@ -32,8 +32,13 @@
 pthread_mutex_t lock_counter = PTHREAD_MUTEX_INITIALIZER;
 static size_t counter = 0;
 
-static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, size_t args_len)
+static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
 {
+	void *args = NULL;
+	size_t args_len = 0;
+
+	lrpc_get_args(ctx, &args, &args_len);
+
 	ck_assert_str_eq(args, TEST_CONTENT);
 	ck_assert_int_eq(args_len, sizeof(TEST_CONTENT));
 
@@ -42,7 +47,7 @@ static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx, v
 	return 0;
 }
 
-static int sync_rpc_exit(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, size_t args_len)
+static int sync_rpc_exit(void *user_data, const struct lrpc_callback_ctx *ctx)
 {
 	*(int *) user_data = 0;
 	lrpc_return(ctx, NULL, 0);

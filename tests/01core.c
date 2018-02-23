@@ -34,8 +34,13 @@ static void *thread_poll_routine(void *user_data)
 	return rc;
 }
 
-static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, size_t args_len)
+static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
 {
+	void *args = NULL;
+	size_t args_len = 0;
+
+	lrpc_get_args(ctx, &args, &args_len);
+
 	ck_assert_str_eq(args, TEST_CONTENT);
 	ck_assert_int_eq(args_len, sizeof(TEST_CONTENT));
 
@@ -44,8 +49,13 @@ static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx, v
 	return 0;
 }
 
-static int async_rpc(void *user_data, const struct lrpc_callback_ctx *ctx, void *args, size_t args_len)
+static int async_rpc(void *user_data, const struct lrpc_callback_ctx *ctx)
 {
+	void *args = NULL;
+	size_t args_len = 0;
+
+	lrpc_get_args(ctx, &args, &args_len);
+
 	struct lrpc_return_ctx *async_ctx = user_data;
 	int rc;
 	ck_assert_ptr_ne(user_data, NULL);

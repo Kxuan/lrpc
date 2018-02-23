@@ -38,7 +38,7 @@ struct lrpc_packet
 
 struct lrpc_callback_ctx;
 
-typedef int (*lrpc_method_cb)(void *user_data, const struct lrpc_callback_ctx *pkt, void *args, size_t args_len);
+typedef int (*lrpc_method_cb)(void *user_data, const struct lrpc_callback_ctx *ctx);
 
 struct lrpc_method
 {
@@ -108,6 +108,8 @@ ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
 
 int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const char *method, const void *args,
                     size_t args_len, lrpc_async_callback cb);
+
+int lrpc_get_args(const struct lrpc_callback_ctx *ctx, void **pargs, size_t *args_len);
 
 void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len);
 

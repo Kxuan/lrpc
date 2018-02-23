@@ -56,6 +56,7 @@ struct lrpc_msg_call
 	// CLOCK_MONOTONIC timeout value
 	struct timespec timeout;
 	char method[LRPC_METHOD_NAME_MAX];
+	char args[0];
 };
 
 struct lrpc_callback_ctx
