@@ -48,15 +48,15 @@ int main()
 {
 	int rc;
 	struct lrpc_interface inf;
-	struct lrpc_method method;
+	struct lrpc_func func;
 	struct rpc_context ctx;
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 
-	lrpc_method_init(&method, "echo", sync_rpc_echo, &ctx);
-	rc = lrpc_method(&inf, &method);
+	lrpc_func_init(&func, "echo", sync_rpc_echo, &ctx);
+	rc = lrpc_export_func(&inf, &func);
 	if (rc < 0) {
-		perror("lrpc_register_method");
+		perror("lrpc_export_func");
 		abort();
 	}
 

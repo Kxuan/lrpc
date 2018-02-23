@@ -38,20 +38,20 @@ struct lrpc_packet
 
 struct lrpc_callback_ctx;
 
-typedef int (*lrpc_method_cb)(void *user_data, const struct lrpc_callback_ctx *ctx);
+typedef int (*lrpc_func_cb)(void *user_data, const struct lrpc_callback_ctx *ctx);
 
-struct lrpc_method
+struct lrpc_func
 {
 	const char *name;
-	lrpc_method_cb callback;
+	lrpc_func_cb callback;
 	void *user_data;
 
-	struct lrpc_method *prev, *next;
+	struct lrpc_func *prev, *next;
 };
 
-struct method_table
+struct func_table
 {
-	struct lrpc_method *all_methods;
+	struct lrpc_func *all_funcs;
 };
 
 struct lrpc_call_ctx;
@@ -82,7 +82,7 @@ struct lrpc_interface
 {
 	int fd;
 	struct lrpc_endpoint local_endpoint;
-	struct method_table all_methods;
+	struct func_table all_funcs;
 
 	pthread_mutex_t lock_call_list;
 	struct lrpc_call_ctx *call_list;
@@ -103,10 +103,10 @@ struct lrpc_return_ctx
 };
 
 ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
-                  const char *method_name, const void *args, size_t args_len,
+                  const char *func_name, const void *args, size_t args_len,
                   void *ret_ptr, size_t ret_size);
 
-int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const char *method, const void *args,
+int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const char *func, const void *args,
                     size_t args_len, lrpc_async_callback cb);
 
 int lrpc_get_args(const struct lrpc_callback_ctx *ctx, void **pargs, size_t *args_len);
@@ -119,12 +119,12 @@ int lrpc_stop(struct lrpc_interface *inf);
 
 int lrpc_poll(struct lrpc_interface *inf);
 
-int lrpc_method(struct lrpc_interface *inf, struct lrpc_method *method);
+int lrpc_export_func(struct lrpc_interface *inf, struct lrpc_func *func);
 
 int lrpc_connect(struct lrpc_interface *inf,
                  struct lrpc_endpoint *endpoint, const char *name, size_t name_len);
 
-void lrpc_method_init(struct lrpc_method *method, const char *name, lrpc_method_cb callback, void *user_data);
+void lrpc_func_init(struct lrpc_func *func, const char *name, lrpc_func_cb callback, void *user_data);
 
 int lrpc_return_async(const struct lrpc_callback_ctx *ctx, struct lrpc_return_ctx *async_ctx);
 

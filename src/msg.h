@@ -52,10 +52,10 @@ struct lrpc_msg_call
 	struct lrpc_msg_head head;
 
 	uint16_t args_len;
-	uint8_t method_len;
+	uint8_t func_len;
 	// CLOCK_MONOTONIC timeout value
 	struct timespec timeout;
-	char method[LRPC_METHOD_NAME_MAX];
+	char func[LRPC_METHOD_NAME_MAX];
 	char args[0];
 };
 
@@ -75,7 +75,7 @@ struct lrpc_msg_return
 int msg_build_call(struct lrpc_endpoint *endpoint,
                    struct lrpc_msg_call *call,
                    struct msghdr *msg,
-                   const char *method_name,
+                   const char *func_name,
                    const void *args, size_t args_len);
 
 #endif //LRPC_MSG_H

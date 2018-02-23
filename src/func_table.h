@@ -19,12 +19,12 @@
 
 #include <lrpc.h>
 
-void method_table_init(struct method_table *table);
+void func_table_init(struct func_table *table);
 
-struct lrpc_method *method_find(const struct method_table *table, const char *method_name, size_t method_len);
+struct lrpc_func *func_find(const struct func_table *table, const char *func_name, size_t func_len);
 
-int method_register(struct method_table *table, struct lrpc_method *method);
+int func_add(struct func_table *table, struct lrpc_func *func);
 
-void method_deregister(struct method_table *table, struct lrpc_method *method);
+void func_remove(struct func_table *table, struct lrpc_func *func);
 
 #endif //LRPC_METHOD_H

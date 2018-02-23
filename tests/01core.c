@@ -71,13 +71,13 @@ static void provider(int sigfd)
 {
 	int rc;
 	struct lrpc_interface inf;
-	struct lrpc_method method;
+	struct lrpc_func func;
 	ssize_t size;
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
-	lrpc_method_init(&method, TEST_METHOD, sync_rpc_echo, NULL);
+	lrpc_func_init(&func, TEST_METHOD, sync_rpc_echo, NULL);
 
-	rc = lrpc_method(&inf, &method);
+	rc = lrpc_export_func(&inf, &func);
 	ck_assert_int_ge(rc, 0);
 
 	rc = lrpc_start(&inf);
@@ -127,13 +127,13 @@ static void async_provider(int sigfd)
 	int rc;
 	ssize_t size;
 	struct lrpc_interface inf;
-	struct lrpc_method method;
+	struct lrpc_func func;
 	struct lrpc_return_ctx ctx = {0};
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
-	lrpc_method_init(&method, TEST_METHOD, async_rpc, &ctx);
+	lrpc_func_init(&func, TEST_METHOD, async_rpc, &ctx);
 
-	rc = lrpc_method(&inf, &method);
+	rc = lrpc_export_func(&inf, &func);
 	ck_assert_int_ge(rc, 0);
 
 	rc = lrpc_start(&inf);

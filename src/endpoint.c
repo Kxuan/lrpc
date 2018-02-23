@@ -69,7 +69,7 @@ static void sync_call_finish(struct lrpc_call_ctx *ctx, int err_code, void *ret_
 }
 
 EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
-                         const char *method_name, const void *args, size_t args_len,
+                         const char *func_name, const void *args, size_t args_len,
                          void *ret_ptr, size_t ret_size)
 {
 	int tmp;
@@ -88,7 +88,7 @@ EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
 	ctx.cb = sync_call_finish;
 
 	pthread_mutex_lock(&sync_ctx.lock);
-	tmp = lrpc_call_async(endpoint, &ctx, method_name, args, args_len, sync_call_finish);
+	tmp = lrpc_call_async(endpoint, &ctx, func_name, args, args_len, sync_call_finish);
 	if (tmp == 0) {
 		while (sync_ctx.done == 0) {
 			pthread_cond_wait(&sync_ctx.cond, &sync_ctx.lock);
@@ -111,7 +111,7 @@ EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
 	return rc;
 }
 
-EXPORT int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const char *method,
+EXPORT int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const char *func,
                            const void *args, size_t args_len, lrpc_async_callback cb)
 {
 	int rc;
@@ -123,12 +123,12 @@ EXPORT int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx 
 	assert(endpoint);
 	assert(ctx);
 	assert(cb);
-	assert(method);
+	assert(func);
 	assert(args_len == 0 || args);
 
 	ctx->cb = cb;
 
-	rc = msg_build_call(endpoint, &call, &msg, method, args, args_len);
+	rc = msg_build_call(endpoint, &call, &msg, func, args, args_len);
 	if (rc < 0) {
 		goto err;
 	}

@@ -22,20 +22,20 @@
 #include <utlist.h>
 #include "lrpc-internal.h"
 #include "msg.h"
-#include "method.h"
+#include "func_table.h"
 
 
 int msg_build_call(struct lrpc_endpoint *endpoint,
                    struct lrpc_msg_call *call,
                    struct msghdr *msg,
-                   const char *method_name,
+                   const char *func_name,
                    const void *args, size_t args_len)
 {
-	size_t method_len;
+	size_t func_len;
 	struct iovec *iov = msg->msg_iov;
 
-	method_len = strlen(method_name);
-	if (method_len > LRPC_METHOD_NAME_MAX) {
+	func_len = strlen(func_name);
+	if (func_len > LRPC_METHOD_NAME_MAX) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -43,9 +43,9 @@ int msg_build_call(struct lrpc_endpoint *endpoint,
 	call->head.cookie = (lrpc_cookie_t) call;
 	call->head.type = LRPC_MSGTYP_CALL;
 	call->head.body_size = (uint16_t) args_len;
-	call->method_len = (uint8_t) method_len;
+	call->func_len = (uint8_t) func_len;
 	call->args_len = (uint16_t) args_len;
-	memcpy(call->method, method_name, method_len);
+	memcpy(call->func, func_name, func_len);
 
 	iov[MSGIOV_HEAD].iov_base = call;
 	iov[MSGIOV_HEAD].iov_len = sizeof(*call);
@@ -190,7 +190,7 @@ EXPORT int lrpc_get_args(const struct lrpc_callback_ctx *ctx, void **pargs, size
 
 static int feed_msg_call(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 {
-	struct lrpc_method *method;
+	struct lrpc_func *func;
 	struct lrpc_callback_ctx ctx;
 	struct lrpc_msg_call *call;
 	int cb_returns;
@@ -198,14 +198,14 @@ static int feed_msg_call(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 	call = (struct lrpc_msg_call *) pkt->payload;
 
 	if (pkt->payload_len < sizeof(*call) ||
-	    call->method_len > sizeof(call->method) ||
+	    call->func_len > sizeof(call->func) ||
 	    call->args_len != pkt->payload_len - sizeof(*call)) {
 		errno = EPROTO;
 		return -1;
 	}
 
-	method = method_find(&inf->all_methods, call->method, call->method_len);
-	if (method == NULL) {
+	func = func_find(&inf->all_funcs, call->func, call->func_len);
+	if (func == NULL) {
 		lrpc_return_error(inf, pkt, EOPNOTSUPP);
 		errno = EINVAL;
 		return -1;
@@ -214,7 +214,7 @@ static int feed_msg_call(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 	ctx.inf = inf;
 	ctx.pkt = pkt;
 	ctx.ret_status = LRPC_RETST_CALLBACK;
-	cb_returns = method->callback(method->user_data, &ctx);
+	cb_returns = func->callback(func->user_data, &ctx);
 
 	if (ctx.ret_status == LRPC_RETST_CALLBACK) {
 		lrpc_return(&ctx, &cb_returns, sizeof(cb_returns));

@@ -59,17 +59,17 @@ static void provider(int sigfd)
 	int rc;
 	ssize_t size;
 	struct lrpc_interface inf;
-	struct lrpc_method method_echo, method_exit;
+	struct lrpc_func func_echo, func_exit;
 	int running = 1;
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
-	lrpc_method_init(&method_echo, TEST_METHOD, sync_rpc_echo, NULL);
-	lrpc_method_init(&method_exit, "exit", sync_rpc_exit, &running);
+	lrpc_func_init(&func_echo, TEST_METHOD, sync_rpc_echo, NULL);
+	lrpc_func_init(&func_exit, "exit", sync_rpc_exit, &running);
 
-	rc = lrpc_method(&inf, &method_echo);
+	rc = lrpc_export_func(&inf, &func_echo);
 	ck_assert_int_ge(rc, 0);
 
-	rc = lrpc_method(&inf, &method_exit);
+	rc = lrpc_export_func(&inf, &func_exit);
 	ck_assert_int_ge(rc, 0);
 
 	rc = lrpc_start(&inf);

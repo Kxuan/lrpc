@@ -17,7 +17,7 @@
 #ifndef LRPC_INTERFACE_H
 #define LRPC_INTERFACE_H
 
-#include "method.h"
+#include "func_table.h"
 
 int inf_async_call(struct lrpc_interface *inf, struct lrpc_call_ctx *ctx, struct msghdr *msg);
 

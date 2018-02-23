@@ -18,46 +18,46 @@
 #include <string.h>
 #include <lrpc-internal.h>
 
-#include "method.h"
+#include "func_table.h"
 
-struct lrpc_method *method_find(const struct method_table *table, const char *method_name, size_t method_len)
+struct lrpc_func *func_find(const struct func_table *table, const char *func_name, size_t func_len)
 {
-	struct lrpc_method *method;
+	struct lrpc_func *func;
 
-	if (method_len > LRPC_METHOD_NAME_MAX)
-		method_len = LRPC_METHOD_NAME_MAX;
+	if (func_len > LRPC_METHOD_NAME_MAX)
+		func_len = LRPC_METHOD_NAME_MAX;
 
-	DL_FOREACH(table->all_methods, method) {
+	DL_FOREACH(table->all_funcs, func) {
 		// todo compare the '\0'
-		if (strncmp(method_name, method->name, method_len) == 0) {
-			return method;
+		if (strncmp(func_name, func->name, func_len) == 0) {
+			return func;
 		}
 	}
 }
 
-int method_register(struct method_table *table, struct lrpc_method *method)
+int func_add(struct func_table *table, struct lrpc_func *func)
 {
-	DL_APPEND(table->all_methods, method);
+	DL_APPEND(table->all_funcs, func);
 	return 0;
 }
 
-void method_deregister(struct method_table *table, struct lrpc_method *method)
+void func_remove(struct func_table *table, struct lrpc_func *func)
 {
-	if (!method) {
+	if (!func) {
 		return;
 	}
 
-	DL_DELETE(table->all_methods, method);
+	DL_DELETE(table->all_funcs, func);
 }
 
-EXPORT void lrpc_method_init(struct lrpc_method *method, const char *name, lrpc_method_cb callback, void *user_data)
+EXPORT void lrpc_func_init(struct lrpc_func *func, const char *name, lrpc_func_cb callback, void *user_data)
 {
-	method->name = name;
-	method->callback = callback;
-	method->user_data = user_data;
+	func->name = name;
+	func->callback = callback;
+	func->user_data = user_data;
 }
 
-void method_table_init(struct method_table *table)
+void func_table_init(struct func_table *table)
 {
-	table->all_methods = NULL;
+	table->all_funcs = NULL;
 }

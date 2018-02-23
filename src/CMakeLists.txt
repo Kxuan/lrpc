@@ -14,7 +14,7 @@
 # <http://www.gnu.org/licenses/>.
 
 add_library(lrpc SHARED
-        method.c method.h
+        func_table.c func_table.h
         interface.c interface.h
         msg.c msg.h
         endpoint.c endpoint.h

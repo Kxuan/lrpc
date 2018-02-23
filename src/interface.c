@@ -68,9 +68,9 @@ EXPORT int lrpc_connect(struct lrpc_interface *inf,
 	return 0;
 }
 
-EXPORT int lrpc_method(struct lrpc_interface *inf, struct lrpc_method *method)
+EXPORT int lrpc_export_func(struct lrpc_interface *inf, struct lrpc_func *func)
 {
-	return method_register(&inf->all_methods, method);
+	return func_add(&inf->all_funcs, func);
 }
 
 EXPORT void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len)
@@ -83,7 +83,7 @@ EXPORT void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len)
 	inf->alloc_packet = default_allocator;
 	inf->free_packet = default_free;
 	endpoint_init(&inf->local_endpoint, inf, name, name_len);
-	method_table_init(&inf->all_methods);
+	func_table_init(&inf->all_funcs);
 }
 
 EXPORT int lrpc_start(struct lrpc_interface *inf)
