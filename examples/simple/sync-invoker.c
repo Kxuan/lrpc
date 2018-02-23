@@ -22,16 +22,21 @@
 
 void *thread_invoke(void *data)
 {
-	ssize_t ret_size;
+	int rc;
+	size_t ret_size;
 	char buf[10];
 	struct lrpc_endpoint *provider = data;
 
-	ret_size = lrpc_call(provider, "echo", "hello", 6, buf, sizeof(buf));
-	if (ret_size < 0) {
+	ret_size = sizeof(buf);
+	rc = lrpc_call(provider, "echo", "hello", 6, buf, &ret_size);
+	if (rc < 0) {
 		perror("lrpc_call");
 		abort();
 	}
-
+	if (ret_size >= sizeof(buf)) {
+		fprintf(stderr, "illegal size\n");
+		abort();
+	}
 	if (strncmp(buf, "hello", ret_size) != 0) {
 		fprintf(stderr, "result mismatched!\n");
 		abort();

@@ -68,12 +68,13 @@ static void sync_call_finish(struct lrpc_call_ctx *ctx, int err_code, void *ret_
 	pthread_mutex_unlock(&sync_ctx->lock);
 }
 
-EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
-                         const char *func_name, const void *args, size_t args_len,
-                         void *ret_ptr, size_t ret_size)
+EXPORT int lrpc_call(struct lrpc_endpoint *endpoint,
+                     const char *func_name, const void *args, size_t args_len,
+                     void *ret_ptr, size_t *ret_size)
 {
-	int tmp;
-	ssize_t rc;
+	assert(ret_ptr != NULL && ret_size != NULL || ret_ptr == NULL && ret_size == NULL);
+
+	int rc;
 	struct lrpc_call_ctx ctx;
 	struct sync_call_context sync_ctx;
 
@@ -81,15 +82,15 @@ EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
 	pthread_cond_init(&sync_ctx.cond, NULL);
 
 	sync_ctx.ret_ptr = ret_ptr;
-	sync_ctx.ret_size = ret_size;
+	sync_ctx.ret_size = ret_size ? *ret_size : 0;
 	sync_ctx.err_code = 0;
 	sync_ctx.done = 0;
 	ctx.user_data = &sync_ctx;
 	ctx.cb = sync_call_finish;
 
 	pthread_mutex_lock(&sync_ctx.lock);
-	tmp = lrpc_call_async(endpoint, &ctx, func_name, args, args_len, sync_call_finish);
-	if (tmp == 0) {
+	rc = lrpc_call_async(endpoint, &ctx, func_name, args, args_len, sync_call_finish);
+	if (rc == 0) {
 		while (sync_ctx.done == 0) {
 			pthread_cond_wait(&sync_ctx.cond, &sync_ctx.lock);
 		}
@@ -99,15 +100,21 @@ EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
 	pthread_mutex_destroy(&sync_ctx.lock);
 	pthread_cond_destroy(&sync_ctx.cond);
 
-	if (tmp < 0) {
-		rc = -2;
-	} else if (sync_ctx.err_code != 0) {
-		rc = -1;
-		errno = sync_ctx.err_code;
-	} else {
-		rc = sync_ctx.ret_size;
+	if (rc < 0) {
+		goto out;
 	}
 
+	if (sync_ctx.err_code != 0) {
+		rc = -1;
+		errno = sync_ctx.err_code;
+		goto out;
+	}
+
+	if (ret_size) {
+		*ret_size = sync_ctx.ret_size;
+	}
+
+out:
 	return rc;
 }
 

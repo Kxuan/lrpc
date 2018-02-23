@@ -111,9 +111,9 @@ struct lrpc_return_ctx
 	lrpc_cookie_t cookie;
 };
 
-ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
+int lrpc_call(struct lrpc_endpoint *endpoint,
                   const char *func_name, const void *args, size_t args_len,
-                  void *ret_ptr, size_t ret_size);
+                  void *ret_ptr, size_t *ret_size);
 
 int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const char *func, const void *args,
                     size_t args_len, lrpc_async_callback cb);

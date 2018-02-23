@@ -122,13 +122,16 @@ static void *thread_poll_routine(void *user_data)
 static void *sync_invoker_routine(void *user_data)
 {
 	int rc;
+	size_t ret_size;
 	char buf[sizeof(TEST_CONTENT)];
 	struct lrpc_endpoint *peer = user_data;
 
 	for (int i = 0; i < TEST_COUNT; ++i) {
 		memset(buf, 0, sizeof(buf));
-		rc = (int) lrpc_call(peer, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), buf, sizeof(buf));
-		ck_assert_int_ge(rc, 0);
+		ret_size = sizeof(buf);
+		rc = lrpc_call(peer, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), buf, &ret_size);
+		ck_assert_int_eq(rc, 0);
+		ck_assert_int_eq(ret_size, sizeof(TEST_CONTENT));
 		ck_assert_str_eq(buf, TEST_CONTENT);
 
 		pthread_mutex_lock(&lock_counter);

@@ -108,6 +108,7 @@ static void sync_invoker(int sigfd)
 	struct lrpc_endpoint peer;
 	pthread_t thread;
 	ssize_t size;
+	size_t ret_size;
 
 	lrpc_init(&inf, NAME_INVOKER, sizeof(NAME_INVOKER));
 
@@ -122,8 +123,10 @@ static void sync_invoker(int sigfd)
 	rc = pthread_create(&thread, NULL, thread_poll_routine, &inf);
 	ck_assert_int_ge(rc, 0);
 
-	rc = (int) lrpc_call(&peer, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), buf, sizeof(buf));
-	ck_assert_int_ge(rc, 0);
+	ret_size = sizeof(buf);
+	rc = lrpc_call(&peer, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), buf, &ret_size);
+	ck_assert_int_eq(rc, 0);
+	ck_assert_int_eq(ret_size, sizeof(TEST_CONTENT));
 
 	rc = pthread_join(thread, NULL);
 	ck_assert_int_ge(rc, 0);
