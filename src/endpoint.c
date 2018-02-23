@@ -44,11 +44,13 @@ void endpoint_init(struct lrpc_endpoint *endpoint, struct lrpc_interface *inf, c
 struct sync_call_context
 {
 	int done;
+	int err_code;
+
+	void *ret;
+	size_t ret_size;
+
 	pthread_mutex_t lock;
 	pthread_cond_t cond;
-	void *ret_ptr;
-	size_t ret_size;
-	int err_code;
 };
 
 static void sync_call_finish(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
@@ -60,7 +62,7 @@ static void sync_call_finish(struct lrpc_call_ctx *ctx, int err_code, void *ret_
 		sync_ctx->err_code = err_code;
 	} else {
 		copy_size = ret_size > sync_ctx->ret_size ? sync_ctx->ret_size : ret_size;
-		memcpy(sync_ctx->ret_ptr, ret_ptr, copy_size);
+		memcpy(sync_ctx->ret, ret_ptr, copy_size);
 		sync_ctx->ret_size = copy_size;
 	}
 	sync_ctx->done = 1;
@@ -81,15 +83,19 @@ EXPORT int lrpc_call(struct lrpc_endpoint *endpoint,
 	pthread_mutex_init(&sync_ctx.lock, NULL);
 	pthread_cond_init(&sync_ctx.cond, NULL);
 
-	sync_ctx.ret_ptr = ret_ptr;
-	sync_ctx.ret_size = ret_size ? *ret_size : 0;
 	sync_ctx.err_code = 0;
 	sync_ctx.done = 0;
+	sync_ctx.ret = ret_ptr;
+	sync_ctx.ret_size = ret_size ? *ret_size : 0;
+
 	ctx.user_data = &sync_ctx;
 	ctx.cb = sync_call_finish;
+	ctx.func = func_name;
+	ctx.args = args;
+	ctx.args_size = args_len;
 
 	pthread_mutex_lock(&sync_ctx.lock);
-	rc = lrpc_call_async(endpoint, &ctx, func_name, args, args_len, sync_call_finish);
+	rc = lrpc_call_async(endpoint, &ctx);
 	if (rc == 0) {
 		while (sync_ctx.done == 0) {
 			pthread_cond_wait(&sync_ctx.cond, &sync_ctx.lock);
@@ -118,28 +124,26 @@ out:
 	return rc;
 }
 
-EXPORT int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const char *func,
-                           const void *args, size_t args_len, lrpc_async_callback cb)
+EXPORT int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx)
 {
 	int rc;
 	struct lrpc_interface *inf;
 	struct iovec iov[MSGIOV_MAX];
 	struct msghdr msg = {.msg_iov = iov};
-	struct lrpc_msg_call call;
+	struct lrpc_msg_call buf;
 
 	assert(endpoint);
 	assert(ctx);
-	assert(cb);
-	assert(func);
-	assert(args_len == 0 || args);
+	assert(ctx->cb);
+	assert(ctx->func);
+	assert(ctx->args_size == 0 || ctx->args);
 
-	ctx->cb = cb;
 
-	rc = msg_build_call(endpoint, &call, &msg, func, args, args_len);
+	ctx->cookie = (lrpc_cookie_t) ctx;
+	rc = msg_build_call(endpoint, &buf, &msg, ctx);
 	if (rc < 0) {
 		goto err;
 	}
-	ctx->cookie = (lrpc_cookie_t) &call;
 
 	inf = endpoint->inf;
 

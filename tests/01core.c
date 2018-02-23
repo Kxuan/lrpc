@@ -187,8 +187,13 @@ static void async_invoker(int sigfd)
 	rc = lrpc_connect(&inf, &peer, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 	ck_assert_int_ge(rc, 0);
 
-	struct lrpc_call_ctx ctx;
-	rc = lrpc_call_async(&peer, &ctx, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), async_call_callback);
+	struct lrpc_call_ctx ctx = {
+		.func = TEST_METHOD,
+		.args = TEST_CONTENT,
+		.args_size = sizeof(TEST_CONTENT),
+		.cb = async_call_callback
+	};
+	rc = lrpc_call_async(&peer, &ctx);
 	ck_assert_int_ge(rc, 0);
 
 	rc = lrpc_poll(&inf);

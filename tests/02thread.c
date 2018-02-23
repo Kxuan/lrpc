@@ -157,16 +157,21 @@ static void *async_invoker_routine(void *user_data)
 {
 	int rc;
 	char buf[sizeof(TEST_CONTENT)];
-	struct lrpc_call_ctx ctx;
 	struct lrpc_endpoint *peer = user_data;
 	sem_t signal;
+	struct lrpc_call_ctx ctx = {
+		.user_data = &signal,
+		.func = TEST_METHOD,
+		.args = TEST_CONTENT,
+		.args_size = sizeof(TEST_CONTENT),
+		.cb = async_echo_callback
+	};
 
 	sem_init(&signal, 0, 0);
-	ctx.user_data = &signal;
 
 	for (int i = 0; i < TEST_COUNT; ++i) {
 		memset(buf, 0, sizeof(buf));
-		rc = lrpc_call_async(peer, &ctx, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), async_echo_callback);
+		rc = lrpc_call_async(peer, &ctx);
 		ck_assert_int_eq(rc, 0);
 
 		rc = sem_wait(&signal);

@@ -72,10 +72,9 @@ struct lrpc_msg_return
 	uint16_t returns_len;
 };
 
-int msg_build_call(struct lrpc_endpoint *endpoint,
+int msg_build_call(const struct lrpc_endpoint *endpoint,
                    struct lrpc_msg_call *call,
                    struct msghdr *msg,
-                   const char *func_name,
-                   const void *args, size_t args_len);
+                   const struct lrpc_call_ctx *ctx);
 
 #endif //LRPC_MSG_H

@@ -74,6 +74,9 @@ struct lrpc_call_ctx
 {
 	void *user_data;
 
+	const char *func;
+	const void *args;
+	size_t args_size;
 	lrpc_async_callback cb;
 
 	/* Private field */
@@ -115,8 +118,7 @@ int lrpc_call(struct lrpc_endpoint *endpoint,
                   const char *func_name, const void *args, size_t args_len,
                   void *ret_ptr, size_t *ret_size);
 
-int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const char *func, const void *args,
-                    size_t args_len, lrpc_async_callback cb);
+int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx);
 
 int lrpc_get_args(const struct lrpc_callback_ctx *ctx, void **pargs, size_t *args_len);
 

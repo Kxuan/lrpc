@@ -34,7 +34,12 @@ int main()
 	int rc;
 	struct lrpc_interface inf;
 	struct lrpc_endpoint provider;
-	struct lrpc_call_ctx call_ctx;
+	struct lrpc_call_ctx call_ctx = {
+		.func = "echo",
+		.args = "hello",
+		.args_size = sizeof("hello"),
+		.cb = callback
+	};
 	pthread_t thd;
 
 	lrpc_init(&inf, NAME_INVOKER, sizeof(NAME_INVOKER));
@@ -45,7 +50,7 @@ int main()
 	rc = lrpc_connect(&inf, &provider, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 	assert(rc >= 0);
 
-	rc = lrpc_call_async(&provider, &call_ctx, "echo", "hello", 6, callback);
+	rc = lrpc_call_async(&provider, &call_ctx);
 	assert(rc >= 0);
 
 	rc = lrpc_poll(&inf);

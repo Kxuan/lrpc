@@ -27,34 +27,34 @@
 #include "func_table.h"
 
 
-int msg_build_call(struct lrpc_endpoint *endpoint,
-                   struct lrpc_msg_call *call,
+int msg_build_call(const struct lrpc_endpoint *endpoint,
+                   struct lrpc_msg_call *buf,
                    struct msghdr *msg,
-                   const char *func_name,
-                   const void *args, size_t args_len)
+                   const struct lrpc_call_ctx *ctx)
 {
 	size_t func_len;
 	struct iovec *iov = msg->msg_iov;
+	struct lrpc_msg_call *c = buf;
 
-	func_len = strlen(func_name);
+	func_len = strlen(ctx->func);
 	if (func_len > LRPC_METHOD_NAME_MAX) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	call->head.cookie = (lrpc_cookie_t) call;
-	call->head.type = LRPC_MSGTYP_CALL;
-	call->head.body_size = (uint16_t) args_len;
-	call->func_len = (uint8_t) func_len;
-	call->args_len = (uint16_t) args_len;
-	memcpy(call->func, func_name, func_len);
+	c->head.cookie = ctx->cookie;
+	c->head.type = LRPC_MSGTYP_CALL;
+	c->head.body_size = (uint16_t) ctx->args_size;
+	c->func_len = (uint8_t) func_len;
+	c->args_len = (uint16_t) ctx->args_size;
+	memcpy(c->func, ctx->func, func_len);
 
-	iov[MSGIOV_HEAD].iov_base = call;
-	iov[MSGIOV_HEAD].iov_len = sizeof(*call);
-	iov[MSGIOV_BODY].iov_base = (void *) args;
-	iov[MSGIOV_BODY].iov_len = args_len;
+	iov[MSGIOV_HEAD].iov_base = c;
+	iov[MSGIOV_HEAD].iov_len = sizeof(*c);
+	iov[MSGIOV_BODY].iov_base = (void *) ctx->args;
+	iov[MSGIOV_BODY].iov_len = ctx->args_size;
 
-	msg->msg_name = &endpoint->addr;
+	msg->msg_name = (struct sockaddr_un *) &endpoint->addr;
 	msg->msg_namelen = endpoint->addr_len;
 	msg->msg_iovlen = MSGIOV_MAX;
 	msg->msg_control = NULL;
