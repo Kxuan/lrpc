@@ -114,7 +114,32 @@ int lrpc_start(struct lrpc_interface *inf);
 
 int lrpc_stop(struct lrpc_interface *inf);
 
+/**
+ * poll message on `inf`. If there is no message on `inf`, the current thread will block to wait a new message.
+ *
+ * @note Please avoid use `lrpc_poll` and `lrpc_try_poll` on same interface at same time. @see `lrpc_try_poll`.
+ * @param inf
+ * @return -1 on failure, 0 on success
+ * @error EPROTO received an malformatted message
+ * @error EINVAL received an invalid function call
+ */
 int lrpc_poll(struct lrpc_interface *inf);
+
+/**
+ * poll message on `inf` without blocking current thread.
+ *
+ * @note Please avoid use `lrpc_poll` and `lrpc_try_poll` on same interface at same time. It causes `lrpc_try_poll`
+ * 		 fails with EBUSY. In this case, you must call lrpc_try_poll() again **after** lrpc_poll() finished, or your
+ * 		 data may delayed or discard.
+ * @param inf
+ * @return -1 on failure, 0 on success
+ * @error EBUSY Another thread is calling `lrpc_poll` or `lrpc_try_poll`.
+ * @error EAGAIN There is no more messages to handle
+ * @error EPROTO received an malformatted message
+ * @error EINVAL received an invalid function call
+ *
+ */
+int lrpc_try_poll(struct lrpc_interface *inf);
 
 int lrpc_export_func(struct lrpc_interface *inf, struct lrpc_func *func);
 

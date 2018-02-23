@@ -101,9 +101,10 @@ EXPORT int lrpc_stop(struct lrpc_interface *inf)
 	}
 }
 
-int inf_poll_unsafe(struct lrpc_interface *inf, struct lrpc_packet *pkt)
+int inf_poll_unsafe(struct lrpc_interface *inf, struct lrpc_packet *pkt, int blocking)
 {
 	int rc;
+	int flags = blocking ? 0 : MSG_DONTWAIT;
 	ssize_t size;
 
 	pkt->iov.iov_base = pkt->payload;
@@ -116,7 +117,7 @@ int inf_poll_unsafe(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 	pkt->msgh.msg_iov = &pkt->iov;
 	pkt->msgh.msg_iovlen = 1;
 
-	size = recvmsg(inf->fd, &pkt->msgh, 0);
+	size = recvmsg(inf->fd, &pkt->msgh, flags);
 	if (size <= 0) {
 		goto err;
 	}
@@ -129,7 +130,7 @@ err:
 	return -1;
 }
 
-EXPORT int lrpc_poll(struct lrpc_interface *inf)
+EXPORT int lrpc_try_poll(struct lrpc_interface *inf)
 {
 	int rc;
 	struct lrpc_packet *pkt = &inf->pkt_buf;
@@ -140,7 +141,21 @@ EXPORT int lrpc_poll(struct lrpc_interface *inf)
 		return -1;
 	}
 
-	rc = inf_poll_unsafe(inf, pkt);
+	rc = inf_poll_unsafe(inf, pkt, 0);
+
+	pthread_mutex_unlock(&inf->lock_poll);
+
+	return rc;
+}
+
+EXPORT int lrpc_poll(struct lrpc_interface *inf)
+{
+	int rc;
+	struct lrpc_packet *pkt = &inf->pkt_buf;
+
+	pthread_mutex_lock(&inf->lock_poll);
+
+	rc = inf_poll_unsafe(inf, pkt, 1);
 
 	pthread_mutex_unlock(&inf->lock_poll);
 
