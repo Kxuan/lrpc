@@ -45,22 +45,6 @@ err:
 	return -1;
 }
 
-static struct lrpc_packet *default_allocator(struct lrpc_interface *inf)
-{
-	struct lrpc_packet *pkt;
-	pkt = (struct lrpc_packet *) malloc(sizeof(struct lrpc_packet));
-	if (pkt == NULL) {
-		return NULL;
-	}
-	pkt->payload_size = sizeof(pkt->payload);
-	return pkt;
-}
-
-static void default_free(struct lrpc_interface *inf, struct lrpc_packet *pkt)
-{
-	free(pkt);
-}
-
 EXPORT int lrpc_connect(struct lrpc_interface *inf,
                         struct lrpc_endpoint *endpoint, const char *name, size_t name_len)
 {
@@ -80,8 +64,7 @@ EXPORT void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len)
 
 	inf->call_list = NULL;
 	inf->fd = -1;
-	inf->alloc_packet = default_allocator;
-	inf->free_packet = default_free;
+	inf->pkt_buf.payload_size = sizeof(inf->pkt_buf.payload);
 	endpoint_init(&inf->local_endpoint, inf, name, name_len);
 	func_table_init(&inf->all_funcs);
 }
@@ -149,11 +132,7 @@ err:
 EXPORT int lrpc_poll(struct lrpc_interface *inf)
 {
 	int rc;
-	struct lrpc_packet *pkt;
-	pkt = inf->alloc_packet(inf);
-	if (!pkt) {
-		return -1;
-	}
+	struct lrpc_packet *pkt = &inf->pkt_buf;
 
 	rc = pthread_mutex_trylock(&inf->lock_poll);
 	if (rc != 0) {
@@ -165,6 +144,5 @@ EXPORT int lrpc_poll(struct lrpc_interface *inf)
 
 	pthread_mutex_unlock(&inf->lock_poll);
 
-	inf->free_packet(inf, pkt);
 	return rc;
 }

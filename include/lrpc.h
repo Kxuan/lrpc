@@ -88,10 +88,7 @@ struct lrpc_interface
 	struct lrpc_call_ctx *call_list;
 
 	pthread_mutex_t lock_poll;
-
-	struct lrpc_packet *(*alloc_packet)(struct lrpc_interface *inf);
-
-	void (*free_packet)(struct lrpc_interface *inf, struct lrpc_packet *pkt);
+	struct lrpc_packet pkt_buf;
 };
 
 struct lrpc_return_ctx
