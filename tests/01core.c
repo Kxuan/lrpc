@@ -38,8 +38,17 @@ static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
 {
 	void *args = NULL;
 	size_t args_len = 0;
+	struct lrpc_ucred cred;
+	int rc;
 
-	lrpc_get_args(ctx, &args, &args_len);
+	rc = lrpc_get_args(ctx, &args, &args_len);
+	ck_assert_int_eq(rc, 0);
+
+	rc = lrpc_get_ucred(ctx, &cred);
+	ck_assert_int_eq(rc, 0);
+	ck_assert_int_ne(cred.pid, getpid());
+	ck_assert_int_eq(cred.uid, getuid());
+	ck_assert_int_eq(cred.gid, getgid());
 
 	ck_assert_str_eq(args, TEST_CONTENT);
 	ck_assert_int_eq(args_len, sizeof(TEST_CONTENT));
