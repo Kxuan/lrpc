@@ -28,11 +28,11 @@
 int msg_build_call(struct lrpc_endpoint *endpoint,
                    struct lrpc_msg_call *call,
                    struct msghdr *msg,
-                   struct iovec iov[MSGIOV_MAX],
                    const char *method_name,
                    const void *args, size_t args_len)
 {
 	size_t method_len;
+	struct iovec *iov = msg->msg_iov;
 
 	method_len = strlen(method_name);
 	if (method_len > LRPC_METHOD_NAME_MAX) {
@@ -54,7 +54,6 @@ int msg_build_call(struct lrpc_endpoint *endpoint,
 
 	msg->msg_name = &endpoint->addr;
 	msg->msg_namelen = endpoint->addr_len;
-	msg->msg_iov = iov;
 	msg->msg_iovlen = MSGIOV_MAX;
 	msg->msg_control = NULL;
 	msg->msg_controllen = 0;
@@ -251,6 +250,7 @@ static int feed_msg_return(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 	return 0;
 
 }
+
 /**
  * feed message to the interface
  *

@@ -74,7 +74,6 @@ struct lrpc_msg_return
 int msg_build_call(struct lrpc_endpoint *endpoint,
                    struct lrpc_msg_call *call,
                    struct msghdr *msg,
-                   struct iovec iov[MSGIOV_MAX],
                    const char *method_name,
                    const void *args, size_t args_len);
 

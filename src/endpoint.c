@@ -17,9 +17,9 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <pthread.h>
-#include <lrpc-internal.h>
+#include <errno.h>
+#include "lrpc-internal.h"
 #include "config.h"
 #include "interface.h"
 #include "msg.h"
@@ -68,90 +68,12 @@ static void sync_call_finish(struct lrpc_call_ctx *ctx, int err_code, void *ret_
 	pthread_mutex_unlock(&sync_ctx->lock);
 }
 
-static int
-endpoint_call_and_wait(struct lrpc_endpoint *endpoint,
-                       struct lrpc_call_ctx *async_ctx, struct sync_call_context *sync_ctx,
-                       const char *method_name, const void *args, size_t args_len)
-{
-	int rc, poll_rc = 0;
-	struct lrpc_interface *inf = endpoint->inf;
-	struct lrpc_packet *pkt = inf->alloc_packet(inf);
-	if (!pkt) {
-		return -1;
-	}
-
-	rc = pthread_mutex_trylock(&inf->lock_poll);
-	if (rc == 0) {
-		/* ok .. we are the one it is so good.
-		 * FIXME the callback of async call is unexpected called by us.
-		 *       The callback of async call should be called by the thread which is calling lrpc_poll().
-         *
-		 * There are some solutions:
-		 *  1) save all request
-		 *      * The first thread allocate a new buffer to receive packet, the other thread wait.
-		 *      * when the first thread receive a new packet, it wake up the correct thread and send the packet to it.
-		 *      * Then the first thread create a new buffer to receive another packet.
-		 *      * When A has received the packet it wants, it wake up another thread, and handle its packet.
-		 *
-		 *      We must dynamic allocate memory to receive packet or we must copy packet, which is a little slow.
-		 *      This solution improves performance by consuming more memory.
-		 *
-		 *  2) only one async request
-		 *      * refuse more than one thread to call lrpc_poll()
-		 *      * when a packet has been received on a thread with sync context,
-		 *        > check if the packet is matched with itself, if it is matched, finish the sync context.
-		 *        > check if the packet is matched with another thread with sync context, copy the returns data to the
-		 *          application, and wake up the matched thread to finish the sync context.
-		 *        > wake up the thread which is calling lrpc_poll(), and go to wait its sync context.
-		 *      * when a packet has been received on the thread calling lrpc_poll()
-		 *        > check if the packet is matched with a thread with sync context, copy the returns data to the
-		 *          application, and wake up the matched thread to finish the sync context.
-		 *        > handle the packet normally in async context.
-		 *
-		 *      There is no need to allocate memory in this solution, but the thread which is chosen to receive messages
-		 *      must copy packet data (returns data) with only 1 cpu. It is slower than the first solution in multi-CPU
-		 *      platform.
-		 *
-		 *  3) currently
-		 *     we call the callback with this thread, so it is a bug.
-		 */
-		rc = lrpc_call_async(endpoint, async_ctx, method_name, args, args_len, sync_call_finish);
-		if (rc == 0) {
-			while (sync_ctx->done == 0 && poll_rc == 0) {
-				poll_rc = inf_poll_unsafe(endpoint->inf, pkt);
-			}
-			if (sync_ctx->done == 0) {
-				rc = poll_rc;
-			}
-		}
-		pthread_mutex_unlock(&inf->lock_poll);
-	} else if (rc == EBUSY) {
-		// there is another thread holding the lock, just wait the thread call us.
-		pthread_mutex_lock(&sync_ctx->lock);
-		rc = lrpc_call_async(endpoint, async_ctx, method_name, args, args_len, sync_call_finish);
-		if (rc == 0) {
-			while (sync_ctx->done == 0) {
-				pthread_cond_wait(&sync_ctx->cond, &sync_ctx->lock);
-			}
-		}
-		pthread_mutex_unlock(&sync_ctx->lock);
-	} else {
-		// we can not get the lock, and the lock is not holding by another thread.
-		// has the lock already initialized by lrpc_init()?
-		errno = rc;
-		rc = -1;
-	}
-
-	inf->free_packet(inf, pkt);
-	return rc;
-}
-
 EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
                          const char *method_name, const void *args, size_t args_len,
                          void *ret_ptr, size_t ret_size)
 {
-	int rc = 0;
-	ssize_t size;
+	int tmp;
+	ssize_t rc;
 	struct lrpc_call_ctx ctx;
 	struct sync_call_context sync_ctx;
 
@@ -165,31 +87,37 @@ EXPORT ssize_t lrpc_call(struct lrpc_endpoint *endpoint,
 	ctx.user_data = &sync_ctx;
 	ctx.cb = sync_call_finish;
 
-	rc = endpoint_call_and_wait(endpoint, &ctx, &sync_ctx, method_name, args, args_len);
+	pthread_mutex_lock(&sync_ctx.lock);
+	tmp = lrpc_call_async(endpoint, &ctx, method_name, args, args_len, sync_call_finish);
+	if (tmp == 0) {
+		while (sync_ctx.done == 0) {
+			pthread_cond_wait(&sync_ctx.cond, &sync_ctx.lock);
+		}
+	}
+	pthread_mutex_unlock(&sync_ctx.lock);
 
 	pthread_mutex_destroy(&sync_ctx.lock);
 	pthread_cond_destroy(&sync_ctx.cond);
 
-	if (rc < 0) {
-		size = -2;
+	if (tmp < 0) {
+		rc = -2;
 	} else if (sync_ctx.err_code != 0) {
-		size = -1;
+		rc = -1;
 		errno = sync_ctx.err_code;
 	} else {
-		size = sync_ctx.ret_size;
+		rc = sync_ctx.ret_size;
 	}
 
-	return size;
+	return rc;
 }
 
-EXPORT int
-lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const char *method, const void *args,
-                size_t args_len, lrpc_async_callback cb)
+EXPORT int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const char *method,
+                           const void *args, size_t args_len, lrpc_async_callback cb)
 {
 	int rc;
 	struct lrpc_interface *inf;
-	struct msghdr msg;
 	struct iovec iov[MSGIOV_MAX];
+	struct msghdr msg = {.msg_iov = iov};
 	struct lrpc_msg_call call;
 
 	assert(endpoint);
@@ -200,7 +128,8 @@ lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, const
 
 	ctx->cb = cb;
 
-	if (msg_build_call(endpoint, &call, &msg, iov, method, args, args_len) < 0) {
+	rc = msg_build_call(endpoint, &call, &msg, method, args, args_len);
+	if (rc < 0) {
 		goto err;
 	}
 	ctx->cookie = (lrpc_cookie_t) &call;
