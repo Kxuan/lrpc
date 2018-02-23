@@ -24,8 +24,13 @@ int sync_rpc_echo(void *user_data,
 {
 	void *args;
 	size_t args_len;
+	struct lrpc_ucred cred;
 
 	lrpc_get_args(ctx, &args, &args_len);
+	if (lrpc_get_ucred(ctx, &cred) == 0) {
+		fprintf(stderr, "%s: invoked by pid = %d, uid = %d, gid = %d\n", __func__, cred.pid, cred.uid, cred.gid);
+	}
+
 	lrpc_return(ctx, args, args_len);
 
 	return 0;

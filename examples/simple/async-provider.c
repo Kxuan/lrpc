@@ -26,14 +26,19 @@ struct rpc_context
 	size_t size;
 };
 
-int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
+int async_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
 {
 	void *args;
 	size_t args_len;
 	struct rpc_context *p = user_data;
+	struct lrpc_ucred cred;
 	size_t copy_size;
 
 	lrpc_get_args(ctx, &args, &args_len);
+
+	if (lrpc_get_ucred(ctx, &cred) == 0) {
+		fprintf(stderr, "%s: invoked by pid = %d, uid = %d, gid = %d\n", __func__, cred.pid, cred.uid, cred.gid);
+	}
 
 	copy_size = sizeof(p->buf) > args_len ? args_len : sizeof(p->buf);
 	memcpy(p->buf, args, copy_size);
@@ -53,7 +58,7 @@ int main()
 
 	lrpc_init(&inf, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 
-	lrpc_func_init(&func, "echo", sync_rpc_echo, &ctx);
+	lrpc_func_init(&func, "echo", async_rpc_echo, &ctx);
 	rc = lrpc_export_func(&inf, &func);
 	if (rc < 0) {
 		perror("lrpc_export_func");

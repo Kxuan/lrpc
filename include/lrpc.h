@@ -26,6 +26,17 @@
 
 typedef uintptr_t lrpc_cookie_t;
 
+struct lrpc_ucred
+{
+	pid_t pid;
+	uid_t uid;
+	gid_t gid;
+};
+struct lrpc_cmsg_ucred
+{
+	struct cmsghdr h;
+	struct lrpc_ucred ucred;
+};
 struct lrpc_packet
 {
 	struct lrpc_packet *prev, *next;
@@ -33,6 +44,7 @@ struct lrpc_packet
 	struct msghdr msgh;
 	struct iovec iov;
 	size_t payload_len, payload_size;
+	char cmsg[sizeof(struct lrpc_cmsg_ucred)];
 	char payload[LRPC_DEFAULT_PACKET_SIZE];
 };
 
@@ -107,6 +119,8 @@ int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx, c
                     size_t args_len, lrpc_async_callback cb);
 
 int lrpc_get_args(const struct lrpc_callback_ctx *ctx, void **pargs, size_t *args_len);
+
+int lrpc_get_ucred(const struct lrpc_callback_ctx *ctx, struct lrpc_ucred *ucred);
 
 void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len);
 

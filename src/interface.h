@@ -21,6 +21,6 @@
 
 int inf_async_call(struct lrpc_interface *inf, struct lrpc_call_ctx *ctx, struct msghdr *msg);
 
-int inf_poll_unsafe(struct lrpc_interface *inf, struct lrpc_packet *pkt, int blocking);
+int inf_poll_unsafe(struct lrpc_interface *inf, struct lrpc_packet *buf, int blocking);
 
 #endif //LRPC_INTERFACE_H

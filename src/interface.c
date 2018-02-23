@@ -13,16 +13,17 @@
    License along with the lrpc; if not, see
    <http://www.gnu.org/licenses/>.  */
 
-
+#include <unistd.h>
 #include <sys/un.h>
+#include <errno.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
 #include <utlist.h>
 #include <lrpc.h>
-#include <stdio.h>
-#include <pthread.h>
 #include <lrpc-internal.h>
-#include <unistd.h>
-#include <errno.h>
-#include <stdlib.h>
 #include "interface.h"
 #include "msg.h"
 #include "endpoint.h"
@@ -73,6 +74,7 @@ EXPORT int lrpc_start(struct lrpc_interface *inf)
 {
 	int fd;
 	int rc;
+	int v;
 
 	assert(inf->fd < 0);
 
@@ -83,11 +85,18 @@ EXPORT int lrpc_start(struct lrpc_interface *inf)
 
 	rc = bind(fd, (struct sockaddr *) &inf->local_endpoint.addr, inf->local_endpoint.addr_len);
 	if (rc < 0) {
-		goto err_bind;
+		goto err_close;
 	}
+
+	v = 1;
+	rc = setsockopt(fd, SOL_SOCKET, SO_PASSCRED, &v, sizeof(v));
+	if (rc < 0) {
+		goto err_close;
+	}
+
 	inf->fd = fd;
 	return 0;
-err_bind:
+err_close:
 	close(fd);
 err:
 	return -1;
@@ -101,29 +110,30 @@ EXPORT int lrpc_stop(struct lrpc_interface *inf)
 	}
 }
 
-int inf_poll_unsafe(struct lrpc_interface *inf, struct lrpc_packet *pkt, int blocking)
+int inf_poll_unsafe(struct lrpc_interface *inf, struct lrpc_packet *buf, int blocking)
 {
 	int rc;
 	int flags = blocking ? 0 : MSG_DONTWAIT;
+	struct lrpc_packet *p = buf;
 	ssize_t size;
 
-	pkt->iov.iov_base = pkt->payload;
-	pkt->iov.iov_len = pkt->payload_size;
+	p->iov.iov_base = p->payload;
+	p->iov.iov_len = p->payload_size;
 
-	pkt->msgh.msg_name = &pkt->addr;
-	pkt->msgh.msg_namelen = sizeof(pkt->addr);
-	pkt->msgh.msg_controllen = 0;
-	pkt->msgh.msg_control = NULL;
-	pkt->msgh.msg_iov = &pkt->iov;
-	pkt->msgh.msg_iovlen = 1;
+	p->msgh.msg_name = &p->addr;
+	p->msgh.msg_namelen = sizeof(p->addr);
+	p->msgh.msg_controllen = sizeof(p->cmsg);
+	p->msgh.msg_control = p->cmsg;
+	p->msgh.msg_iov = &p->iov;
+	p->msgh.msg_iovlen = 1;
 
-	size = recvmsg(inf->fd, &pkt->msgh, flags);
+	size = recvmsg(inf->fd, &p->msgh, flags);
 	if (size <= 0) {
 		goto err;
 	}
-	pkt->payload_len = (size_t) size;
+	p->payload_len = (size_t) size;
 
-	rc = lrpc_msg_feed(inf, pkt);
+	rc = lrpc_msg_feed(inf, p);
 	return rc;
 
 err:

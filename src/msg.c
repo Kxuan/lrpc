@@ -13,6 +13,8 @@
    License along with the lrpc; if not, see
    <http://www.gnu.org/licenses/>.*/
 
+#define _GNU_SOURCE
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -185,6 +187,30 @@ EXPORT int lrpc_get_args(const struct lrpc_callback_ctx *ctx, void **pargs, size
 	if (args_len) {
 		*args_len = ctx->pkt->payload_len - offsetof(struct lrpc_msg_call, args);
 	}
+	return 0;
+}
+
+EXPORT int lrpc_get_ucred(const struct lrpc_callback_ctx *ctx, struct lrpc_ucred *ucred)
+{
+	struct lrpc_packet *p = ctx->pkt;
+	struct ucred *c = NULL;
+	struct cmsghdr *cm = CMSG_FIRSTHDR(&p->msgh);
+	while (cm != NULL) {
+		if (cm->cmsg_level == SOL_SOCKET && cm->cmsg_type == SCM_CREDENTIALS) {
+			c = (struct ucred *) CMSG_DATA(cm);
+			break;
+		}
+		cm = CMSG_NXTHDR(&p->msgh, cm);
+	}
+
+	if (!c) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	ucred->pid = c->pid;
+	ucred->gid = c->gid;
+	ucred->uid = c->uid;
 	return 0;
 }
 
