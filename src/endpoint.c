@@ -41,6 +41,13 @@ void endpoint_init(struct lrpc_endpoint *endpoint, struct lrpc_interface *inf, c
 	endpoint->addr_len = (socklen_t) (offsetof(struct sockaddr_un, sun_path) + (p - endpoint->addr.sun_path));
 }
 
+EXPORT int lrpc_endpoint_name(const struct lrpc_endpoint *endpoint, const char **name, size_t *name_len)
+{
+	*name = endpoint->addr.sun_path + sizeof(LRPC_MSG_NAME_PREFIX);
+	*name_len = endpoint->addr_len - offsetof(struct sockaddr_un, sun_path) - sizeof(LRPC_MSG_NAME_PREFIX);
+	return 0;
+}
+
 struct sync_call_context
 {
 	int done;

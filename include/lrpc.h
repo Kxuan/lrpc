@@ -114,14 +114,37 @@ struct lrpc_return_ctx
 	lrpc_cookie_t cookie;
 };
 
+int lrpc_endpoint_name(const struct lrpc_endpoint *endpoint, const char **name, size_t *name_len);
+
 int lrpc_call(struct lrpc_endpoint *endpoint,
-                  const char *func_name, const void *args, size_t args_len,
-                  void *ret_ptr, size_t *ret_size);
+              const char *func_name, const void *args, size_t args_len,
+              void *ret_ptr, size_t *ret_size);
 
 int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx);
 
+/**
+ * Get the arguments from context
+ * @param ctx The context of function callback
+ * @param pargs will be update to contain the address of arguments
+ * @param args_len will be update to contain the size of arguments
+ * @return -1 on failure, 0 on success
+ */
 int lrpc_get_args(const struct lrpc_callback_ctx *ctx, void **pargs, size_t *args_len);
 
+/**
+ * Get the invoker from context
+ * @param ctx The context of function callback
+ * @param endpoint will be update to contain the endpoint of the invoker
+ * @return -1 on failure, 0 on success
+ */
+int lrpc_get_invoker(const struct lrpc_callback_ctx *ctx, struct lrpc_endpoint *endpoint);
+
+/**
+ * Get the credential information of the invoker
+ * @param ctx The context of function callback
+ * @param ucred will be update to contain the credential information of the invoker
+ * @return -1 on failure, 0 on success
+ */
 int lrpc_get_ucred(const struct lrpc_callback_ctx *ctx, struct lrpc_ucred *ucred);
 
 void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len);

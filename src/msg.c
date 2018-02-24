@@ -190,6 +190,18 @@ EXPORT int lrpc_get_args(const struct lrpc_callback_ctx *ctx, void **pargs, size
 	return 0;
 }
 
+EXPORT int lrpc_get_invoker(const struct lrpc_callback_ctx *ctx, struct lrpc_endpoint *endpoint)
+{
+	assert(endpoint != NULL);
+
+	struct lrpc_packet *p = ctx->pkt;
+
+	endpoint->inf = ctx->inf;
+	endpoint->addr_len = p->msgh.msg_namelen;
+	endpoint->addr = p->addr;
+	return 0;
+}
+
 EXPORT int lrpc_get_ucred(const struct lrpc_callback_ctx *ctx, struct lrpc_ucred *ucred)
 {
 	struct lrpc_packet *p = ctx->pkt;

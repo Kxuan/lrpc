@@ -32,13 +32,25 @@ int async_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
 	size_t args_len;
 	struct rpc_context *p = user_data;
 	struct lrpc_ucred cred;
+	struct lrpc_endpoint ep;
 	size_t copy_size;
+	const char *name;
+	size_t name_len;
 
 	lrpc_get_args(ctx, &args, &args_len);
 
-	if (lrpc_get_ucred(ctx, &cred) == 0) {
-		fprintf(stderr, "%s: invoked by pid = %d, uid = %d, gid = %d\n", __func__, cred.pid, cred.uid, cred.gid);
+	if (lrpc_get_ucred(ctx, &cred) < 0) {
+		perror("lrpc_get_ucred");
 	}
+	if (lrpc_get_invoker(ctx, &ep) < 0) {
+		perror("lrpc_get_invoker");
+	}
+	if (lrpc_endpoint_name(&ep, &name, &name_len) < 0) {
+		perror("lrpc_endpoint_name");
+	}
+	fprintf(stderr, "%s: invoked by \"%-*s\" with pid = %d, uid = %d, gid = %d\n", __func__,
+	        (int) name_len, name,
+	        cred.pid, cred.uid, cred.gid);
 
 	copy_size = sizeof(p->buf) > args_len ? args_len : sizeof(p->buf);
 	memcpy(p->buf, args, copy_size);
