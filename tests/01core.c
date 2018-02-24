@@ -55,7 +55,7 @@ static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
 	rc = lrpc_endpoint_name(&ep, &name, &name_len);
 	ck_assert_int_eq(rc, 0);
 	ck_assert_int_eq(name_len, sizeof(NAME_INVOKER));
-	ck_assert_mem_eq(name, NAME_INVOKER, sizeof(NAME_INVOKER));
+	ck_assert_int_eq(memcmp(name, NAME_INVOKER, sizeof(NAME_INVOKER)), 0);
 
 	rc = lrpc_get_args(ctx, &args, &args_len);
 	ck_assert_int_eq(rc, 0);
