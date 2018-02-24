@@ -39,10 +39,10 @@ static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
 	void *args = NULL;
 	size_t args_len = 0;
 	struct lrpc_ucred cred;
+	struct lrpc_endpoint ep;
+	const char *name;
+	size_t name_len;
 	int rc;
-
-	rc = lrpc_get_args(ctx, &args, &args_len);
-	ck_assert_int_eq(rc, 0);
 
 	rc = lrpc_get_ucred(ctx, &cred);
 	ck_assert_int_eq(rc, 0);
@@ -50,8 +50,18 @@ static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
 	ck_assert_int_eq(cred.uid, getuid());
 	ck_assert_int_eq(cred.gid, getgid());
 
+	rc = lrpc_get_invoker(ctx, &ep);
+	ck_assert_int_eq(rc, 0);
+	rc = lrpc_endpoint_name(&ep, &name, &name_len);
+	ck_assert_int_eq(rc, 0);
+	ck_assert_int_eq(name_len, sizeof(NAME_INVOKER));
+	ck_assert_mem_eq(name, NAME_INVOKER, sizeof(NAME_INVOKER));
+
+	rc = lrpc_get_args(ctx, &args, &args_len);
+	ck_assert_int_eq(rc, 0);
 	ck_assert_str_eq(args, TEST_CONTENT);
 	ck_assert_int_eq(args_len, sizeof(TEST_CONTENT));
+
 
 	lrpc_return(ctx, args, args_len);
 
