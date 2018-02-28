@@ -20,7 +20,7 @@
 #include "common.h"
 
 int sync_rpc_echo(void *user_data,
-                  const struct lrpc_callback_ctx *ctx)
+                  const struct lrpc_invoke_ctx *ctx)
 {
 	void *args;
 	size_t args_len;

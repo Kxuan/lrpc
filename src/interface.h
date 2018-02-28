@@ -19,7 +19,7 @@
 
 #include "func_table.h"
 
-int inf_async_call(struct lrpc_interface *inf, struct lrpc_call_ctx *ctx, struct msghdr *msg);
+int inf_async_invoke(struct lrpc_interface *inf, struct lrpc_invoke_req *ctx, struct msghdr *msg);
 
 int inf_poll_unsafe(struct lrpc_interface *inf, struct lrpc_packet *buf, int blocking);
 

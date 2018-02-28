@@ -34,7 +34,7 @@ static void *thread_poll_routine(void *user_data)
 	return rc;
 }
 
-static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
+static int sync_rpc_echo(void *user_data, const struct lrpc_invoke_ctx *ctx)
 {
 	void *args = NULL;
 	size_t args_len = 0;
@@ -68,7 +68,7 @@ static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
 	return 0;
 }
 
-static int async_rpc(void *user_data, const struct lrpc_callback_ctx *ctx)
+static int async_rpc(void *user_data, const struct lrpc_invoke_ctx *ctx)
 {
 	void *args = NULL;
 	size_t args_len = 0;
@@ -134,7 +134,7 @@ static void sync_invoker(int sigfd)
 	ck_assert_int_ge(rc, 0);
 
 	ret_size = sizeof(buf);
-	rc = lrpc_call(&peer, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), buf, &ret_size);
+	rc = lrpc_invoke_sync(&peer, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), buf, &ret_size);
 	ck_assert_int_eq(rc, 0);
 	ck_assert_int_eq(ret_size, sizeof(TEST_CONTENT));
 
@@ -171,7 +171,7 @@ static void async_provider(int sigfd)
 	ck_assert_int_ge(rc, 0);
 }
 
-static void async_call_callback(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
+static void async_invoke_callback(struct lrpc_invoke_req *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
 	ck_assert_int_eq(err_code, 0);
 	ck_assert_int_eq(ret_size, sizeof(TEST_CONTENT));
@@ -197,13 +197,13 @@ static void async_invoker(int sigfd)
 	rc = lrpc_connect(&inf, &peer, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 	ck_assert_int_ge(rc, 0);
 
-	struct lrpc_call_ctx ctx = {
+	struct lrpc_invoke_req ctx = {
 		.func = TEST_METHOD,
 		.args = TEST_CONTENT,
 		.args_size = sizeof(TEST_CONTENT),
-		.cb = async_call_callback
+		.cb = async_invoke_callback
 	};
-	rc = lrpc_call_async(&peer, &ctx);
+	rc = lrpc_invoke(&peer, &ctx);
 	ck_assert_int_ge(rc, 0);
 
 	rc = lrpc_poll(&inf);
@@ -257,7 +257,7 @@ START_TEST(test_02async_return)
 	}
 END_TEST
 
-START_TEST(test_03async_call)
+START_TEST(test_03async_invoke)
 	int rc;
 	pid_t pid;
 	int fds[2];
@@ -279,7 +279,7 @@ START_TEST(test_03async_call)
 	}
 END_TEST
 
-START_TEST(test_04async_call_return)
+START_TEST(test_04async_invoke_return)
 	int rc;
 	pid_t pid;
 	int fds[2];
@@ -316,8 +316,8 @@ int main()
 	tcase_set_timeout(tc, 0.1);
 	tcase_add_test(tc, test_01sync);
 	tcase_add_test(tc, test_02async_return);
-	tcase_add_test(tc, test_03async_call);
-	tcase_add_test(tc, test_04async_call_return);
+	tcase_add_test(tc, test_03async_invoke);
+	tcase_add_test(tc, test_04async_invoke_return);
 
 
 	suite_add_tcase(s, tc);

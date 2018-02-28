@@ -20,7 +20,7 @@
 #include <assert.h>
 #include "common.h"
 
-void callback(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
+void callback(struct lrpc_invoke_req *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
 	if (strncmp(ret_ptr, "hello", ret_size) != 0) {
 		fprintf(stderr, "result mismatched!\n");
@@ -34,7 +34,7 @@ int main()
 	int rc;
 	struct lrpc_interface inf;
 	struct lrpc_endpoint provider;
-	struct lrpc_call_ctx call_ctx = {
+	struct lrpc_invoke_req invoke_req = {
 		.func = "echo",
 		.args = "hello",
 		.args_size = sizeof("hello"),
@@ -50,7 +50,18 @@ int main()
 	rc = lrpc_connect(&inf, &provider, NAME_PROVIDER, sizeof(NAME_PROVIDER));
 	assert(rc >= 0);
 
-	rc = lrpc_call_async(&provider, &call_ctx);
+/**
+ * You can use "compound literals" with C99 or GCC
+#if __STDC_VERSION__ >= 199901L || defined(__GNUC__)
+	rc = lrpc_invoke_async(&provider, &(struct lrpc_invoke_req) {
+		.func = "echo",
+		.args = "hello",
+		.args_size = sizeof("hello"),
+		.cb = callback
+	});
+#endif
+**/
+	rc = lrpc_invoke(&provider, &invoke_req);
 	assert(rc >= 0);
 
 	rc = lrpc_poll(&inf);

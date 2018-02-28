@@ -27,23 +27,23 @@
 #include "func_table.h"
 
 
-int msg_build_call(const struct lrpc_endpoint *endpoint,
-                   struct lrpc_msg_call *buf,
-                   struct msghdr *msg,
-                   const struct lrpc_call_ctx *ctx)
+int msg_build_invoke(const struct lrpc_endpoint *endpoint,
+                     struct lrpc_msg_invoke *buf,
+                     struct msghdr *msg,
+                     const struct lrpc_invoke_req *ctx)
 {
 	size_t func_len;
 	struct iovec *iov = msg->msg_iov;
-	struct lrpc_msg_call *c = buf;
+	struct lrpc_msg_invoke *c = buf;
 
 	func_len = strlen(ctx->func);
-	if (func_len > LRPC_METHOD_NAME_MAX) {
+	if (func_len > LRPC_FUNC_NAME_MAX) {
 		errno = EINVAL;
 		return -1;
 	}
 
 	c->head.cookie = ctx->cookie;
-	c->head.type = LRPC_MSGTYP_CALL;
+	c->head.type = LRPC_MSGTYP_INVOKE;
 	c->head.body_size = (uint16_t) ctx->args_size;
 	c->func_len = (uint8_t) func_len;
 	c->args_len = (uint16_t) ctx->args_size;
@@ -102,25 +102,24 @@ static int lrpc_do_return(struct lrpc_interface *inf,
 
 static int lrpc_return_error(struct lrpc_interface *inf, struct lrpc_packet *pkt, int err)
 {
-	struct lrpc_msg_call *call;
-	call = (struct lrpc_msg_call *) pkt->payload;
+	struct lrpc_msg_invoke *invoke = (struct lrpc_msg_invoke *) pkt->payload;
 	return lrpc_do_return(inf,
 	                      &pkt->addr, pkt->msgh.msg_namelen,
-	                      call->head.cookie,
+	                      invoke->head.cookie,
 	                      LRPC_MSGTYP_RETURN_ERROR,
 	                      &err, sizeof(err));
 
 }
 
-EXPORT int lrpc_return_async(const struct lrpc_callback_ctx *user_ctx, struct lrpc_return_ctx *async_ctx)
+EXPORT int lrpc_return_async(const struct lrpc_invoke_ctx *user_ctx, struct lrpc_return_ctx *async_ctx)
 {
-	struct lrpc_callback_ctx *ctx;
+	struct lrpc_invoke_ctx *ctx;
 	struct lrpc_packet *pkt;
-	struct lrpc_msg_call *call;
+	struct lrpc_msg_invoke *invoke;
 
-	ctx = (struct lrpc_callback_ctx *) user_ctx;
+	ctx = (struct lrpc_invoke_ctx *) user_ctx;
 	pkt = ctx->pkt;
-	call = (struct lrpc_msg_call *) pkt->payload;
+	invoke = (struct lrpc_msg_invoke *) pkt->payload;
 
 	if (ctx->ret_status != LRPC_RETST_CALLBACK) {
 		errno = EINVAL;
@@ -128,7 +127,7 @@ EXPORT int lrpc_return_async(const struct lrpc_callback_ctx *user_ctx, struct lr
 	}
 
 	async_ctx->inf = ctx->inf;
-	async_ctx->cookie = call->head.cookie;
+	async_ctx->cookie = invoke->head.cookie;
 	async_ctx->addr = pkt->addr;
 	async_ctx->addr_len = pkt->msgh.msg_namelen;
 
@@ -145,19 +144,19 @@ EXPORT int lrpc_return_finish(struct lrpc_return_ctx *ctx, const void *ret, size
 	                      ret, ret_size);
 }
 
-EXPORT int lrpc_return(const struct lrpc_callback_ctx *user_ctx, const void *ret, size_t ret_size)
+EXPORT int lrpc_return(const struct lrpc_invoke_ctx *user_ctx, const void *ret, size_t ret_size)
 {
 	int rc;
-	struct lrpc_callback_ctx *ctx;
+	struct lrpc_invoke_ctx *ctx;
 	struct lrpc_packet *pkt;
-	struct lrpc_msg_call *call;
+	struct lrpc_msg_invoke *invoke;
 
 	assert(user_ctx != NULL);
 	assert(ret_size == 0 || ret != NULL);
 
-	ctx = (struct lrpc_callback_ctx *) user_ctx;
+	ctx = (struct lrpc_invoke_ctx *) user_ctx;
 	pkt = ctx->pkt;
-	call = (struct lrpc_msg_call *) pkt->payload;
+	invoke = (struct lrpc_msg_invoke *) pkt->payload;
 
 	if (ctx->ret_status != LRPC_RETST_CALLBACK) {
 		errno = EINVAL;
@@ -166,7 +165,7 @@ EXPORT int lrpc_return(const struct lrpc_callback_ctx *user_ctx, const void *ret
 
 	rc = lrpc_do_return(ctx->inf,
 	                    &pkt->addr, pkt->msgh.msg_namelen,
-	                    call->head.cookie,
+	                    invoke->head.cookie,
 	                    LRPC_MSGTYP_RETURN,
 	                    ret, ret_size);
 
@@ -177,20 +176,20 @@ EXPORT int lrpc_return(const struct lrpc_callback_ctx *user_ctx, const void *ret
 	return rc;
 }
 
-EXPORT int lrpc_get_args(const struct lrpc_callback_ctx *ctx, void **pargs, size_t *args_len)
+EXPORT int lrpc_get_args(const struct lrpc_invoke_ctx *ctx, void **pargs, size_t *args_len)
 {
-	struct lrpc_msg_call *call = (struct lrpc_msg_call *) ctx->pkt->payload;
+	struct lrpc_msg_invoke *invoke = (struct lrpc_msg_invoke *) ctx->pkt->payload;
 	if (pargs) {
-		*pargs = call->args;
+		*pargs = invoke->args;
 	}
 
 	if (args_len) {
-		*args_len = ctx->pkt->payload_len - offsetof(struct lrpc_msg_call, args);
+		*args_len = ctx->pkt->payload_len - offsetof(struct lrpc_msg_invoke, args);
 	}
 	return 0;
 }
 
-EXPORT int lrpc_get_invoker(const struct lrpc_callback_ctx *ctx, struct lrpc_endpoint *endpoint)
+EXPORT int lrpc_get_invoker(const struct lrpc_invoke_ctx *ctx, struct lrpc_endpoint *endpoint)
 {
 	assert(endpoint != NULL);
 
@@ -202,7 +201,7 @@ EXPORT int lrpc_get_invoker(const struct lrpc_callback_ctx *ctx, struct lrpc_end
 	return 0;
 }
 
-EXPORT int lrpc_get_ucred(const struct lrpc_callback_ctx *ctx, struct lrpc_ucred *ucred)
+EXPORT int lrpc_get_ucred(const struct lrpc_invoke_ctx *ctx, struct lrpc_ucred *ucred)
 {
 	struct lrpc_packet *p = ctx->pkt;
 	struct ucred *c = NULL;
@@ -229,20 +228,20 @@ EXPORT int lrpc_get_ucred(const struct lrpc_callback_ctx *ctx, struct lrpc_ucred
 static int feed_msg_call(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 {
 	struct lrpc_func *func;
-	struct lrpc_callback_ctx ctx;
-	struct lrpc_msg_call *call;
+	struct lrpc_invoke_ctx ctx;
+	struct lrpc_msg_invoke *invoke;
 	int cb_returns;
 
-	call = (struct lrpc_msg_call *) pkt->payload;
+	invoke = (struct lrpc_msg_invoke *) pkt->payload;
 
-	if (pkt->payload_len < sizeof(*call) ||
-	    call->func_len > sizeof(call->func) ||
-	    call->args_len != pkt->payload_len - sizeof(*call)) {
+	if (pkt->payload_len < sizeof(*invoke) ||
+	    invoke->func_len > sizeof(invoke->func) ||
+	    invoke->args_len != pkt->payload_len - sizeof(*invoke)) {
 		errno = EPROTO;
 		return -1;
 	}
 
-	func = func_find(&inf->all_funcs, call->func, call->func_len);
+	func = func_find(&inf->all_funcs, invoke->func, invoke->func_len);
 	if (func == NULL) {
 		lrpc_return_error(inf, pkt, EOPNOTSUPP);
 		errno = EINVAL;
@@ -275,15 +274,15 @@ static int feed_msg_return(struct lrpc_interface *inf, struct lrpc_packet *pkt)
 		return -1;
 	}
 
-	struct lrpc_call_ctx *ctx;
-	pthread_mutex_lock(&inf->lock_call_list);
-	DL_FOREACH(inf->call_list, ctx) {
+	struct lrpc_invoke_req *ctx;
+	pthread_mutex_lock(&inf->lock_invoke_reqs);
+	DL_FOREACH(inf->invoke_reqs, ctx) {
 		if (ctx->cookie == returns->head.cookie) {
-			DL_DELETE(inf->call_list, ctx);
+			DL_DELETE(inf->invoke_reqs, ctx);
 			break;
 		}
 	}
-	pthread_mutex_unlock(&inf->lock_call_list);
+	pthread_mutex_unlock(&inf->lock_invoke_reqs);
 	if (!ctx) {
 		return -1;
 	}
@@ -322,7 +321,7 @@ int lrpc_msg_feed(struct lrpc_interface *inf, struct lrpc_packet *msg)
 	}
 
 	switch (head->type) {
-	case LRPC_MSGTYP_CALL:
+	case LRPC_MSGTYP_INVOKE:
 		rc = feed_msg_call(inf, msg);
 		break;
 	case LRPC_MSGTYP_RETURN:

@@ -28,21 +28,21 @@
 #include "msg.h"
 #include "endpoint.h"
 
-int inf_async_call(struct lrpc_interface *inf, struct lrpc_call_ctx *ctx, struct msghdr *msg)
+int inf_async_invoke(struct lrpc_interface *inf, struct lrpc_invoke_req *ctx, struct msghdr *msg)
 {
 	ssize_t size;
-	pthread_mutex_lock(&inf->lock_call_list);
-	DL_APPEND(inf->call_list, ctx);
-	pthread_mutex_unlock(&inf->lock_call_list);
+	pthread_mutex_lock(&inf->lock_invoke_reqs);
+	DL_APPEND(inf->invoke_reqs, ctx);
+	pthread_mutex_unlock(&inf->lock_invoke_reqs);
 	size = sendmsg(inf->fd, msg, 0);
 	if (size <= 0) {
 		goto err;
 	}
 	return 0;
 err:
-	pthread_mutex_lock(&inf->lock_call_list);
-	DL_DELETE(inf->call_list, ctx);
-	pthread_mutex_unlock(&inf->lock_call_list);
+	pthread_mutex_lock(&inf->lock_invoke_reqs);
+	DL_DELETE(inf->invoke_reqs, ctx);
+	pthread_mutex_unlock(&inf->lock_invoke_reqs);
 	return -1;
 }
 
@@ -60,10 +60,10 @@ EXPORT int lrpc_export_func(struct lrpc_interface *inf, struct lrpc_func *func)
 
 EXPORT void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len)
 {
-	pthread_mutex_init(&inf->lock_call_list, NULL);
+	pthread_mutex_init(&inf->lock_invoke_reqs, NULL);
 	pthread_mutex_init(&inf->lock_poll, NULL);
 
-	inf->call_list = NULL;
+	inf->invoke_reqs = NULL;
 	inf->fd = -1;
 	inf->pkt_buf.payload_size = sizeof(inf->pkt_buf.payload);
 	endpoint_init(&inf->local_endpoint, inf, name, name_len);

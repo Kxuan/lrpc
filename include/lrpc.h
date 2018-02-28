@@ -21,8 +21,7 @@
 #include <stdint.h>
 
 #define LRPC_DEFAULT_PACKET_SIZE (4096)
-#define LRPC_METHOD_NAME_MAX (32)
-
+#define LRPC_FUNC_NAME_MAX (32)
 
 typedef uintptr_t lrpc_cookie_t;
 
@@ -48,9 +47,9 @@ struct lrpc_packet
 	char payload[LRPC_DEFAULT_PACKET_SIZE];
 };
 
-struct lrpc_callback_ctx;
+struct lrpc_invoke_ctx;
 
-typedef int (*lrpc_func_cb)(void *user_data, const struct lrpc_callback_ctx *ctx);
+typedef int (*lrpc_func_cb)(void *user_data, const struct lrpc_invoke_ctx *ctx);
 
 struct lrpc_func
 {
@@ -66,22 +65,23 @@ struct func_table
 	struct lrpc_func *all_funcs;
 };
 
-struct lrpc_call_ctx;
+struct lrpc_invoke_req;
 
-typedef void (*lrpc_async_callback)(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size);
+typedef void (*lrpc_ivk_ret_cb)(struct lrpc_invoke_req *ctx, int err_code, void *ret_ptr, size_t ret_size);
 
-struct lrpc_call_ctx
+struct lrpc_invoke_req
 {
-	void *user_data;
-
+	lrpc_ivk_ret_cb cb;
 	const char *func;
+
 	const void *args;
 	size_t args_size;
-	lrpc_async_callback cb;
+
+	void *user_data;
 
 	/* Private field */
 	lrpc_cookie_t cookie;
-	struct lrpc_call_ctx *prev, *next;
+	struct lrpc_invoke_req *prev, *next;
 };
 
 struct lrpc_interface;
@@ -99,8 +99,8 @@ struct lrpc_interface
 	struct lrpc_endpoint local_endpoint;
 	struct func_table all_funcs;
 
-	pthread_mutex_t lock_call_list;
-	struct lrpc_call_ctx *call_list;
+	pthread_mutex_t lock_invoke_reqs;
+	struct lrpc_invoke_req *invoke_reqs;
 
 	pthread_mutex_t lock_poll;
 	struct lrpc_packet pkt_buf;
@@ -116,11 +116,11 @@ struct lrpc_return_ctx
 
 int lrpc_endpoint_name(const struct lrpc_endpoint *endpoint, const char **name, size_t *name_len);
 
-int lrpc_call(struct lrpc_endpoint *endpoint,
-              const char *func_name, const void *args, size_t args_len,
-              void *ret_ptr, size_t *ret_size);
+int lrpc_invoke_sync(struct lrpc_endpoint *endpoint,
+                     const char *func_name, const void *args, size_t args_len,
+                     void *ret_ptr, size_t *ret_size);
 
-int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx);
+int lrpc_invoke(struct lrpc_endpoint *endpoint, struct lrpc_invoke_req *ctx);
 
 /**
  * Get the arguments from context
@@ -129,7 +129,7 @@ int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx);
  * @param args_len will be update to contain the size of arguments
  * @return -1 on failure, 0 on success
  */
-int lrpc_get_args(const struct lrpc_callback_ctx *ctx, void **pargs, size_t *args_len);
+int lrpc_get_args(const struct lrpc_invoke_ctx *ctx, void **pargs, size_t *args_len);
 
 /**
  * Get the invoker from context
@@ -137,7 +137,7 @@ int lrpc_get_args(const struct lrpc_callback_ctx *ctx, void **pargs, size_t *arg
  * @param endpoint will be update to contain the endpoint of the invoker
  * @return -1 on failure, 0 on success
  */
-int lrpc_get_invoker(const struct lrpc_callback_ctx *ctx, struct lrpc_endpoint *endpoint);
+int lrpc_get_invoker(const struct lrpc_invoke_ctx *ctx, struct lrpc_endpoint *endpoint);
 
 /**
  * Get the credential information of the invoker
@@ -145,7 +145,7 @@ int lrpc_get_invoker(const struct lrpc_callback_ctx *ctx, struct lrpc_endpoint *
  * @param ucred will be update to contain the credential information of the invoker
  * @return -1 on failure, 0 on success
  */
-int lrpc_get_ucred(const struct lrpc_callback_ctx *ctx, struct lrpc_ucred *ucred);
+int lrpc_get_ucred(const struct lrpc_invoke_ctx *ctx, struct lrpc_ucred *ucred);
 
 void lrpc_init(struct lrpc_interface *inf, char *name, size_t name_len);
 
@@ -160,7 +160,7 @@ int lrpc_stop(struct lrpc_interface *inf);
  * @param inf
  * @return -1 on failure, 0 on success
  * @error EPROTO received an malformatted message
- * @error EINVAL received an invalid function call
+ * @error EINVAL received an invalid function invoke
  */
 int lrpc_poll(struct lrpc_interface *inf);
 
@@ -175,7 +175,7 @@ int lrpc_poll(struct lrpc_interface *inf);
  * @error EBUSY Another thread is calling `lrpc_poll` or `lrpc_try_poll`.
  * @error EAGAIN There is no more messages to handle
  * @error EPROTO received an malformatted message
- * @error EINVAL received an invalid function call
+ * @error EINVAL received an invalid function invoke
  *
  */
 int lrpc_try_poll(struct lrpc_interface *inf);
@@ -187,11 +187,11 @@ int lrpc_connect(struct lrpc_interface *inf,
 
 void lrpc_func_init(struct lrpc_func *func, const char *name, lrpc_func_cb callback, void *user_data);
 
-int lrpc_return_async(const struct lrpc_callback_ctx *ctx, struct lrpc_return_ctx *async_ctx);
+int lrpc_return_async(const struct lrpc_invoke_ctx *ctx, struct lrpc_return_ctx *async_ctx);
 
 int lrpc_return_finish(struct lrpc_return_ctx *ctx, const void *ret, size_t ret_size);
 
-int lrpc_return(const struct lrpc_callback_ctx *ctx, const void *ret, size_t ret_size);
+int lrpc_return(const struct lrpc_invoke_ctx *ctx, const void *ret, size_t ret_size);
 
 int lrpc_msg_feed(struct lrpc_interface *inf, struct lrpc_packet *msg);
 

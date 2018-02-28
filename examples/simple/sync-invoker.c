@@ -28,9 +28,9 @@ void *thread_invoke(void *data)
 	struct lrpc_endpoint *provider = data;
 
 	ret_size = sizeof(buf);
-	rc = lrpc_call(provider, "echo", "hello", 6, buf, &ret_size);
+	rc = lrpc_invoke_sync(provider, "echo", "hello", 6, buf, &ret_size);
 	if (rc < 0) {
-		perror("lrpc_call");
+		perror("lrpc_invoke_sync");
 		abort();
 	}
 	if (ret_size >= sizeof(buf)) {

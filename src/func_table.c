@@ -24,8 +24,8 @@ struct lrpc_func *func_find(const struct func_table *table, const char *func_nam
 {
 	struct lrpc_func *func;
 
-	if (func_len > LRPC_METHOD_NAME_MAX)
-		func_len = LRPC_METHOD_NAME_MAX;
+	if (func_len > LRPC_FUNC_NAME_MAX)
+		func_len = LRPC_FUNC_NAME_MAX;
 
 	DL_FOREACH(table->all_funcs, func) {
 		// todo compare the '\0'

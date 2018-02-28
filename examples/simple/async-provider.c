@@ -26,7 +26,7 @@ struct rpc_context
 	size_t size;
 };
 
-int async_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
+int async_rpc_echo(void *user_data, const struct lrpc_invoke_ctx *ctx)
 {
 	void *args;
 	size_t args_len;

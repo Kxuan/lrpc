@@ -28,7 +28,7 @@ enum msgiov_types
 
 enum lrpc_msg_types
 {
-	LRPC_MSGTYP_CALL,
+	LRPC_MSGTYP_INVOKE,
 	LRPC_MSGTYP_RETURN,
 	LRPC_MSGTYP_RETURN_ERROR
 };
@@ -47,7 +47,7 @@ enum lrpc_call_ret_status
 	LRPC_RETST_DONE
 };
 
-struct lrpc_msg_call
+struct lrpc_msg_invoke
 {
 	struct lrpc_msg_head head;
 
@@ -55,11 +55,11 @@ struct lrpc_msg_call
 	uint8_t func_len;
 	// CLOCK_MONOTONIC timeout value
 	struct timespec timeout;
-	char func[LRPC_METHOD_NAME_MAX];
+	char func[LRPC_FUNC_NAME_MAX];
 	char args[0];
 };
 
-struct lrpc_callback_ctx
+struct lrpc_invoke_ctx
 {
 	struct lrpc_interface *inf;
 	struct lrpc_packet *pkt;
@@ -72,9 +72,9 @@ struct lrpc_msg_return
 	uint16_t returns_len;
 };
 
-int msg_build_call(const struct lrpc_endpoint *endpoint,
-                   struct lrpc_msg_call *call,
-                   struct msghdr *msg,
-                   const struct lrpc_call_ctx *ctx);
+int msg_build_invoke(const struct lrpc_endpoint *endpoint,
+                     struct lrpc_msg_invoke *buf,
+                     struct msghdr *msg,
+                     const struct lrpc_invoke_req *ctx);
 
 #endif //LRPC_MSG_H

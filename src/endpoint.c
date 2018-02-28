@@ -48,7 +48,7 @@ EXPORT int lrpc_endpoint_name(const struct lrpc_endpoint *endpoint, const char *
 	return 0;
 }
 
-struct sync_call_context
+struct sync_invoke_ctx
 {
 	int done;
 	int err_code;
@@ -60,9 +60,9 @@ struct sync_call_context
 	pthread_cond_t cond;
 };
 
-static void sync_call_finish(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
+static void sync_invoke_finish(struct lrpc_invoke_req *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
-	struct sync_call_context *sync_ctx = ctx->user_data;
+	struct sync_invoke_ctx *sync_ctx = ctx->user_data;
 	size_t copy_size;
 	pthread_mutex_lock(&sync_ctx->lock);
 	if (err_code != 0) {
@@ -77,15 +77,15 @@ static void sync_call_finish(struct lrpc_call_ctx *ctx, int err_code, void *ret_
 	pthread_mutex_unlock(&sync_ctx->lock);
 }
 
-EXPORT int lrpc_call(struct lrpc_endpoint *endpoint,
-                     const char *func_name, const void *args, size_t args_len,
-                     void *ret_ptr, size_t *ret_size)
+EXPORT int lrpc_invoke_sync(struct lrpc_endpoint *endpoint,
+                            const char *func_name, const void *args, size_t args_len,
+                            void *ret_ptr, size_t *ret_size)
 {
 	assert(ret_ptr != NULL && ret_size != NULL || ret_ptr == NULL && ret_size == NULL);
 
 	int rc;
-	struct lrpc_call_ctx ctx;
-	struct sync_call_context sync_ctx;
+	struct lrpc_invoke_req ctx;
+	struct sync_invoke_ctx sync_ctx;
 
 	pthread_mutex_init(&sync_ctx.lock, NULL);
 	pthread_cond_init(&sync_ctx.cond, NULL);
@@ -96,13 +96,13 @@ EXPORT int lrpc_call(struct lrpc_endpoint *endpoint,
 	sync_ctx.ret_size = ret_size ? *ret_size : 0;
 
 	ctx.user_data = &sync_ctx;
-	ctx.cb = sync_call_finish;
+	ctx.cb = sync_invoke_finish;
 	ctx.func = func_name;
 	ctx.args = args;
 	ctx.args_size = args_len;
 
 	pthread_mutex_lock(&sync_ctx.lock);
-	rc = lrpc_call_async(endpoint, &ctx);
+	rc = lrpc_invoke(endpoint, &ctx);
 	if (rc == 0) {
 		while (sync_ctx.done == 0) {
 			pthread_cond_wait(&sync_ctx.cond, &sync_ctx.lock);
@@ -131,13 +131,13 @@ out:
 	return rc;
 }
 
-EXPORT int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx *ctx)
+EXPORT int lrpc_invoke(struct lrpc_endpoint *endpoint, struct lrpc_invoke_req *ctx)
 {
 	int rc;
 	struct lrpc_interface *inf;
 	struct iovec iov[MSGIOV_MAX];
 	struct msghdr msg = {.msg_iov = iov};
-	struct lrpc_msg_call buf;
+	struct lrpc_msg_invoke buf;
 
 	assert(endpoint);
 	assert(ctx);
@@ -147,14 +147,14 @@ EXPORT int lrpc_call_async(struct lrpc_endpoint *endpoint, struct lrpc_call_ctx 
 
 
 	ctx->cookie = (lrpc_cookie_t) ctx;
-	rc = msg_build_call(endpoint, &buf, &msg, ctx);
+	rc = msg_build_invoke(endpoint, &buf, &msg, ctx);
 	if (rc < 0) {
 		goto err;
 	}
 
 	inf = endpoint->inf;
 
-	rc = inf_async_call(inf, ctx, &msg);
+	rc = inf_async_invoke(inf, ctx, &msg);
 	if (rc < 0) {
 		goto err;
 	}

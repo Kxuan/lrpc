@@ -32,7 +32,7 @@
 pthread_mutex_t lock_counter = PTHREAD_MUTEX_INITIALIZER;
 static size_t counter = 0;
 
-static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
+static int sync_rpc_echo(void *user_data, const struct lrpc_invoke_ctx *ctx)
 {
 	void *args = NULL;
 	size_t args_len = 0;
@@ -47,7 +47,7 @@ static int sync_rpc_echo(void *user_data, const struct lrpc_callback_ctx *ctx)
 	return 0;
 }
 
-static int sync_rpc_exit(void *user_data, const struct lrpc_callback_ctx *ctx)
+static int sync_rpc_exit(void *user_data, const struct lrpc_invoke_ctx *ctx)
 {
 	*(int *) user_data = 0;
 	lrpc_return(ctx, NULL, 0);
@@ -129,7 +129,7 @@ static void *sync_invoker_routine(void *user_data)
 	for (int i = 0; i < TEST_COUNT; ++i) {
 		memset(buf, 0, sizeof(buf));
 		ret_size = sizeof(buf);
-		rc = lrpc_call(peer, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), buf, &ret_size);
+		rc = lrpc_invoke_sync(peer, TEST_METHOD, TEST_CONTENT, sizeof(TEST_CONTENT), buf, &ret_size);
 		ck_assert_int_eq(rc, 0);
 		ck_assert_int_eq(ret_size, sizeof(TEST_CONTENT));
 		ck_assert_str_eq(buf, TEST_CONTENT);
@@ -141,7 +141,7 @@ static void *sync_invoker_routine(void *user_data)
 
 }
 
-static void async_echo_callback(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
+static void async_echo_callback(struct lrpc_invoke_req *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
 	ck_assert_int_eq(err_code, 0);
 	ck_assert_str_eq(ret_ptr, TEST_CONTENT);
@@ -159,7 +159,7 @@ static void *async_invoker_routine(void *user_data)
 	char buf[sizeof(TEST_CONTENT)];
 	struct lrpc_endpoint *peer = user_data;
 	sem_t signal;
-	struct lrpc_call_ctx ctx = {
+	struct lrpc_invoke_req ctx = {
 		.user_data = &signal,
 		.func = TEST_METHOD,
 		.args = TEST_CONTENT,
@@ -171,7 +171,7 @@ static void *async_invoker_routine(void *user_data)
 
 	for (int i = 0; i < TEST_COUNT; ++i) {
 		memset(buf, 0, sizeof(buf));
-		rc = lrpc_call_async(peer, &ctx);
+		rc = lrpc_invoke(peer, &ctx);
 		ck_assert_int_eq(rc, 0);
 
 		rc = sem_wait(&signal);
@@ -180,7 +180,7 @@ static void *async_invoker_routine(void *user_data)
 	sem_destroy(&signal);
 }
 
-static void async_exit_callback(struct lrpc_call_ctx *ctx, int err_code, void *ret_ptr, size_t ret_size)
+static void async_exit_callback(struct lrpc_invoke_req *ctx, int err_code, void *ret_ptr, size_t ret_size)
 {
 	ck_assert_ptr_ne(ctx, NULL);
 	ck_assert_int_eq(err_code, 0);
@@ -256,7 +256,7 @@ static void run_invoker()
 		ck_assert_ptr_eq(thread_rc, NULL);
 	}
 
-	rc = (int) lrpc_call(peer + 0, "exit", NULL, 0, NULL, 0);
+	rc = (int) lrpc_invoke_sync(peer + 0, "exit", NULL, 0, NULL, 0);
 	ck_assert_int_ge(rc, 0);
 
 	pthread_cancel(thread_poll);
